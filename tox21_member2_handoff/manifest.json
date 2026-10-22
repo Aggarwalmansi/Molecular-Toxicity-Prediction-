@@ -1,0 +1,67 @@
+{
+  "pipeline_version": "Member2_Handoff_v1.2",
+  "date": "2026-10-23",
+  "source_dataset_sha256": "89a23c7c9d1559f8561aff5316696aff37ef558293f5af58d1f4d484479d2d01",
+  "n_molecules": 7823,
+  "n_train": 6259,
+  "n_val": 782,
+  "n_test": 782,
+  "artifacts": {
+    "X_combined.parquet": {
+      "size_bytes": 1961916,
+      "sha256": "05e03718a2a02c0731b7742ddba05b72db6551a519bc1e81d46e1d72ca6dfb09"
+    },
+    "X_combined_raw.parquet": {
+      "size_bytes": 1936394,
+      "sha256": "f7ca557d80e0ad887040cd24b4e7a386244a8ad00a66a1a338fe800cd08a57a4"
+    },
+    "X_descriptors_raw.parquet": {
+      "size_bytes": 202818,
+      "sha256": "369bf2475153d911dcd7a903d4df8f7906279560dfa368b68326f8c9f5c47cd7"
+    },
+    "X_descriptors_scaled.parquet": {
+      "size_bytes": 228336,
+      "sha256": "50d492dd0091c9bf588dce5d7bb5146aa3e76a23ca334d0713accdd3e582846b"
+    },
+    "X_morgan.parquet": {
+      "size_bytes": 1654169,
+      "sha256": "dafe50848ecd6a8ae82b548a66f5f6958328e972987a4164f94c3f16f67303d6"
+    },
+    "X_morgan_unsupervised_filtered.parquet": {
+      "size_bytes": 975994,
+      "sha256": "c7c520f2ee94fe14c729cce4ed7a89627433bb403ba132353bc74c57543631ce"
+    },
+    "X_pca_combined.parquet": {
+      "size_bytes": 3745150,
+      "sha256": "0a6554667ef83462724160588508d7ddd27129e2736ee979e3da53178ee1a70f"
+    },
+    "X_pca_descriptors.parquet": {
+      "size_bytes": 358256,
+      "sha256": "6820a41a2c96295bde0a391820be56dd97821ce3415579ebe2e92eb8a0365550"
+    },
+    "X_pca_morgan.parquet": {
+      "size_bytes": 3639782,
+      "sha256": "d12d21643b407366ff7589f853ac7607c7b5fd17c4d80cb0bfb5463806ef9228"
+    },
+    "corrected_scaffold_split.csv": {
+      "size_bytes": 1179756,
+      "sha256": "89a23c7c9d1559f8561aff5316696aff37ef558293f5af58d1f4d484479d2d01"
+    },
+    "endpoint_top50_features.csv": {
+      "size_bytes": 30429,
+      "sha256": "2055f3fefdd5236d38337746cfe3ef498e4012ac7e151f3bd74404ba33ecba4a"
+    },
+    "feature_selection_summary.csv": {
+      "size_bytes": 1278,
+      "sha256": "62d726fe41700437fed0f62ce9360713dd2cb46475c14cbe3d78bfe9824fc52b"
+    },
+    "labels_and_splits.parquet": {
+      "size_bytes": 460691,
+      "sha256": "b62a2bc92c2bfa572d1f157ebd49a7b12819eec0b616c9bc52c9cda1f2aba1ab"
+    },
+    "scaler_descriptors.json": {
+      "size_bytes": 428,
+      "sha256": "6ffacea514d4c7c31b8a5cfebeadcd20e572902629b304c45b8cb96ec4ba5830"
+    }
+  }
+}

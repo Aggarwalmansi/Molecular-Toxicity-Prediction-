@@ -1,0 +1,13 @@
+endpoint,train_observed_n,train_positives,top_1_associated_feature,top_1_association_score,top_5_associated_features
+NR-AR,5853,233,morgan_519,1727.23,"morgan_519, morgan_84, morgan_1436, morgan_529, morgan_622"
+NR-AR-LBD,5504,190,morgan_519,1576.32,"morgan_519, morgan_84, morgan_529, morgan_1436, morgan_622"
+NR-AhR,5314,583,morgan_1750,349.17,"morgan_1750, morgan_1380, morgan_875, morgan_1873, morgan_1457"
+NR-Aromatase,4799,206,morgan_1381,172.72,"morgan_1381, morgan_272, MolLogP, morgan_1101, morgan_1373"
+NR-ER,5089,629,morgan_1313,306.17,"morgan_1313, morgan_408, morgan_519, morgan_622, morgan_745"
+NR-ER-LBD,5641,289,morgan_1313,529.57,"morgan_1313, morgan_622, morgan_408, morgan_745, morgan_1778"
+NR-PPAR-gamma,5300,133,morgan_1802,286.28,"morgan_1802, morgan_959, morgan_500, morgan_2000, morgan_1188"
+SR-ARE,4856,724,MolWt,167.8,"MolWt, MolLogP, morgan_1873, morgan_1602, morgan_15"
+SR-ATAD5,5741,192,morgan_465,109.53,"morgan_465, morgan_352, morgan_1680, morgan_1802, morgan_1854"
+SR-HSE,5314,282,morgan_1188,146.59,"morgan_1188, MolLogP, morgan_506, morgan_110, morgan_97"
+SR-MMP,4792,712,morgan_1602,551.35,"morgan_1602, MolLogP, morgan_1873, morgan_875, morgan_202"
+SR-p53,5517,285,morgan_202,123.59,"morgan_202, MolWt, morgan_884, morgan_1602, morgan_1988"

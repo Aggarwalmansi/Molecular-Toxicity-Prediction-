@@ -1,0 +1,9 @@
+# Tox21 Member 2 Feature Engineering Pipeline Dependencies
+# Python >= 3.9 (tested on Python 3.10.16 on macOS arm64 / Darwin)
+
+numpy>=1.22.0
+pandas>=1.4.0
+rdkit>=2022.03.1
+pyarrow>=8.0.0
+fastparquet>=0.8.0
+nbformat>=5.4.0
