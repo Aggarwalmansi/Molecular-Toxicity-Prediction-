@@ -38,6 +38,17 @@ The project is structured into modular phase deliverables:
         ├── scaler_descriptors.json      # Training-fitted scaler parameters (mean, std)
         ├── endpoint_top50_features.csv  # Top 50 associated features per endpoint (Chi2/ANOVA)
         └── feature_selection_summary.csv# Summary of top feature associations per endpoint
+├── train_models.py                # Member 3: Baseline model training
+├── evaluate.py                    # Member 4: Comprehensive evaluation, bootstrap CIs, paired tests, and plotting
+├── requirements-eval.txt          # Member 4: Minimal dependencies for evaluation and analysis
+└── results/                       # Member 4: Official evaluation metrics, statistics, and diagnostic plots
+    ├── metrics.csv                # Per-endpoint metrics with 95% bootstrap CIs and threshold stats
+    ├── summary_metrics.csv        # Macro-averaged summary table across all 12 endpoints
+    ├── statistical_tests.csv      # Paired Bootstrap and Wilcoxon signed-rank significance tests
+    ├── split_comparison.csv       # Scaffold Split vs. Random Split benchmark (Task 6)
+    ├── test_predictions.csv       # Compound-level predictions with SMILES, scaffolds, probabilities, and labels
+    ├── error_analysis.md          # Scientific error analysis report with chemical and statistical failure modes
+    └── plots/                     # 7 publication-grade diagnostic figures (300 DPI)
 ```
 
 ---
@@ -76,3 +87,31 @@ y_train_obs = y_train[mask_train]  # 233 active, 5,620 inactive
 ```
 
 For full feature definitions, PCA analysis, and univariate rankings, see [`tox21_member2_handoff/README.md`](tox21_member2_handoff/README.md).
+
+---
+
+## Member 4: Evaluation, Statistics and Error Analysis
+
+Member 4 provides rigorous statistical benchmarking, error diagnosis, and proves whether models truly generalize:
+
+### Running the Evaluation Suite
+```bash
+# 1. Install dependencies
+pip install -r requirements-eval.txt
+
+# 2. Run full evaluation, statistical tests, Task 6 random-split experiment, and generate all plots
+python evaluate.py
+```
+
+### Macro-Averaged Benchmark Summary (All 12 Endpoints)
+
+| Model | Test ROC-AUC (Mean ± Std) | Test PR-AUC (Mean ± Std) | F1-Score (Mean ± Std) | Balanced Accuracy | Matthews Corr. Coeff. (MCC) |
+|---|---|---|---|---|---|
+| **Random Forest** | **0.7541 ± 0.0570** | **0.3962 ± 0.1323** | **0.3969 ± 0.1070** | **0.6684 ± 0.0507** | **0.3141 ± 0.1177** |
+| **Logistic Regression** | 0.7152 ± 0.0596 | 0.2949 ± 0.1319 | 0.3268 ± 0.1355 | 0.6358 ± 0.0761 | 0.2413 ± 0.1233 |
+| **Decision Tree** | 0.6428 ± 0.0597 | 0.2091 ± 0.0957 | 0.2629 ± 0.1182 | 0.6295 ± 0.0592 | 0.1616 ± 0.0859 |
+
+### Key Takeaways
+- **Statistical Superiority**: Random Forest significantly outperforms Logistic Regression ($p < 0.01$) and Decision Tree ($p < 0.001$) across almost all endpoints in PR-AUC and probabilistic prediction error (Wilcoxon signed-rank test).
+- **Scaffold Generalization Gap (Task 6)**: Random splitting artificially inflates macro ROC-AUC by **+0.0840** (up to **+0.1616** on `SR-p53` and **+0.1610** on `NR-ER`). Scaffold splitting is crucial to avoid false optimism in molecular property prediction.
+- **Scientific Error Analysis**: Full failure mode analysis on underperforming targets (`NR-ER`, `NR-PPAR-gamma`, `SR-ATAD5`) is documented in [`results/error_analysis.md`](results/error_analysis.md).

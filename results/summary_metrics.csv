@@ -1,0 +1,6 @@
+,test_roc_auc,test_roc_auc,test_pr_auc,test_pr_auc,f1_score,f1_score,balanced_accuracy,balanced_accuracy,mcc,mcc
+,mean,std,mean,std,mean,std,mean,std,mean,std
+model,,,,,,,,,,
+Decision Tree,0.6428,0.0597,0.2091,0.0957,0.2629,0.1182,0.6295,0.0592,0.1616,0.0859
+Logistic Regression,0.7152,0.0596,0.2949,0.1319,0.3268,0.1355,0.6358,0.0761,0.2413,0.1233
+Random Forest,0.7541,0.057,0.3962,0.1323,0.3969,0.107,0.6684,0.0507,0.3141,0.1177
