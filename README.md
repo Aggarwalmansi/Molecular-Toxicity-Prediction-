@@ -118,3 +118,6 @@ streamlit run app.py
 - **Statistical Superiority**: Random Forest significantly outperforms Logistic Regression ($p < 0.01$) and Decision Tree ($p < 0.001$) across almost all endpoints in PR-AUC and probabilistic prediction error (Wilcoxon signed-rank test).
 - **Scaffold Generalization Gap (Task 6)**: Random splitting artificially inflates macro ROC-AUC by **+0.0840** (up to **+0.1616** on `SR-p53` and **+0.1610** on `NR-ER`). Scaffold splitting is crucial to avoid false optimism in molecular property prediction.
 - **Scientific Error Analysis**: Full failure mode analysis on underperforming targets (`NR-ER`, `NR-PPAR-gamma`, `SR-ATAD5`) is documented in [`results/error_analysis.md`](results/error_analysis.md).
+
+
+Hosted Link - https://molecular-toxicity-prediction.onrender.com/
