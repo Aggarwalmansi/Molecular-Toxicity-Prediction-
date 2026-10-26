@@ -101,6 +101,9 @@ pip install -r requirements-eval.txt
 
 # 2. Run full evaluation, statistical tests, Task 6 random-split experiment, and generate all plots
 python evaluate.py
+
+# 3. Launch the Interactive Streamlit Dashboard Frontend
+streamlit run app.py
 ```
 
 ### Macro-Averaged Benchmark Summary (All 12 Endpoints)
