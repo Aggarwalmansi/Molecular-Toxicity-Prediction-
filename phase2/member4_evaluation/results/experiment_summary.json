@@ -1,0 +1,99 @@
+{
+  "project": "Molecular Toxicity Prediction using Tox21 Dataset",
+  "phase": "Phase 2 - Member 4 Evaluation & Ablation Studies",
+  "certified_split": "Split B Frozen Scaffold Split (6,259 train / 782 val / 782 test)",
+  "random_seeds": [
+    42,
+    21,
+    7
+  ],
+  "num_endpoints": 12,
+  "models_evaluated": [
+    "Standalone Random Forest",
+    "MultiTask Deep Learning",
+    "ML+DL Hybrid Model",
+    "Single-Task Deep Learning",
+    "DL Ablation: No Dropout (0.0)",
+    "DL Ablation: Unweighted Loss",
+    "Hybrid Ablation: No Descriptors"
+  ],
+  "macro_performance_summary": [
+    {
+      "Model_Architecture": "Standalone Random Forest",
+      "Phase": "Phase 1 Baseline",
+      "Features": "2,053 (2048 Morgan + 5 Descriptors)",
+      "ROC-AUC_mean": 0.7541,
+      "PR-AUC_mean": 0.3962,
+      "F1-Score_mean": 0.3969,
+      "Balanced_Acc_mean": 0.6684,
+      "MCC_mean": 0.3141,
+      "Notes": "Original Phase 1 competitive benchmark"
+    },
+    {
+      "Model_Architecture": "MultiTask Deep Learning",
+      "Phase": "Phase 2 Member 2",
+      "Features": "2,053 -> 128 bottleneck -> 12 outputs",
+      "ROC-AUC_mean": 0.7179,
+      "PR-AUC_mean": 0.3376,
+      "F1-Score_mean": 0.359,
+      "Balanced_Acc_mean": 0.6437,
+      "MCC_mean": 0.2856,
+      "Notes": "Canonical MultiTaskToxicNet production model"
+    },
+    {
+      "Model_Architecture": "ML+DL Hybrid Model",
+      "Phase": "Phase 2 Member 3",
+      "Features": "133 (128 embeddings + 5 descriptors)",
+      "ROC-AUC_mean": 0.6753,
+      "PR-AUC_mean": 0.3009,
+      "F1-Score_mean": 0.2933,
+      "Balanced_Acc_mean": 0.5921,
+      "MCC_mean": 0.2712,
+      "Notes": "Negative result honestly reported (bottleneck compression penalty)"
+    },
+    {
+      "Model_Architecture": "Single-Task Deep Learning",
+      "Phase": "Phase 2 Member 4",
+      "Features": "2,053 per endpoint (12 independent nets)",
+      "ROC-AUC_mean": 0.702,
+      "PR-AUC_mean": 0.3197,
+      "F1-Score_mean": 0.3335,
+      "Balanced_Acc_mean": 0.6485,
+      "MCC_mean": 0.25,
+      "Notes": "Trained on individual observed endpoints across 3 seeds"
+    },
+    {
+      "Model_Architecture": "DL Ablation: No Dropout (0.0)",
+      "Phase": "Phase 2 Member 4",
+      "Features": "2,053 canonical input",
+      "ROC-AUC_mean": 0.7476,
+      "PR-AUC_mean": 0.3207,
+      "F1-Score_mean": 0.289,
+      "Balanced_Acc_mean": 0.6807,
+      "MCC_mean": 0.2167,
+      "Notes": "Quantifies overfitting penalty when dropout regularization is removed"
+    },
+    {
+      "Model_Architecture": "DL Ablation: Unweighted Loss",
+      "Phase": "Phase 2 Member 4",
+      "Features": "2,053 canonical input",
+      "ROC-AUC_mean": 0.7484,
+      "PR-AUC_mean": 0.3489,
+      "F1-Score_mean": 0.2331,
+      "Balanced_Acc_mean": 0.577,
+      "MCC_mean": 0.2255,
+      "Notes": "Evaluates sensitivity and false-negative burden without class weighting"
+    },
+    {
+      "Model_Architecture": "Hybrid Ablation: No Descriptors",
+      "Phase": "Phase 2 Member 3 / Member 4",
+      "Features": "128 (Embeddings only, no 5 descriptors)",
+      "ROC-AUC_mean": 0.6738,
+      "PR-AUC_mean": 0.2985,
+      "F1-Score_mean": 0.291,
+      "Balanced_Acc_mean": 0.589,
+      "MCC_mean": 0.268,
+      "Notes": "Descriptors show negligible difference (-0.0015 on validation)"
+    }
+  ]
+}

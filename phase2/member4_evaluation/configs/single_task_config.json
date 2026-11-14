@@ -1,0 +1,42 @@
+{
+  "experiment_name": "single_task_vs_multitask",
+  "feature_set": "combined",
+  "input_dim": 2053,
+  "hidden_dims": [512, 256],
+  "latent_dim": 128,
+  "num_outputs": 1,
+  "dropout": 0.35,
+  "activation": "relu",
+  "norm_type": "batch_norm",
+  "seeds": [42, 21, 7],
+  "target_assays": [
+    "NR-AR",
+    "NR-AR-LBD",
+    "NR-AhR",
+    "NR-Aromatase",
+    "NR-ER",
+    "NR-ER-LBD",
+    "NR-PPAR-gamma",
+    "SR-ARE",
+    "SR-ATAD5",
+    "SR-HSE",
+    "SR-MMP",
+    "SR-p53"
+  ],
+  "training": {
+    "batch_size": 64,
+    "max_epochs": 100,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "early_stopping_patience": 15,
+    "early_stopping_metric": "val_roc_auc",
+    "lr_scheduler": {
+      "type": "ReduceLROnPlateau",
+      "mode": "max",
+      "factor": 0.5,
+      "patience": 5,
+      "min_lr": 1e-05
+    }
+  }
+}
+

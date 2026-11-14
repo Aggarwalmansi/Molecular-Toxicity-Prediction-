@@ -1,0 +1,36 @@
+{
+  "experiment_name": "three_random_seed_evaluation",
+  "seeds": [42, 21, 7],
+  "models_to_evaluate": [
+    "Standalone Random Forest",
+    "MultiTask Deep Learning",
+    "ML+DL Hybrid Model",
+    "Single-Task Deep Learning"
+  ],
+  "target_assays": [
+    "NR-AR",
+    "NR-AR-LBD",
+    "NR-AhR",
+    "NR-Aromatase",
+    "NR-ER",
+    "NR-ER-LBD",
+    "NR-PPAR-gamma",
+    "SR-ARE",
+    "SR-ATAD5",
+    "SR-HSE",
+    "SR-MMP",
+    "SR-p53"
+  ],
+  "metrics": [
+    "ROC-AUC",
+    "PR-AUC",
+    "F1-Score",
+    "Precision",
+    "Recall"
+  ],
+  "aggregation": [
+    "mean",
+    "std"
+  ]
+}
+

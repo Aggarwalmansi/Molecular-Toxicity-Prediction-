@@ -1,0 +1,38 @@
+{
+  "experiment_name": "class_weight_ablation",
+  "feature_set": "combined",
+  "input_dim": 2053,
+  "hidden_dims": [512, 256],
+  "latent_dim": 128,
+  "num_endpoints": 12,
+  "dropout": 0.35,
+  "activation": "relu",
+  "norm_type": "batch_norm",
+  "configurations": {
+    "weighted_loss": {
+      "use_class_weights": true,
+      "description": "Masked BCE with positive class weighting strictly from training observed labels"
+    },
+    "unweighted_loss": {
+      "use_class_weights": false,
+      "description": "Masked BCE without positive class weighting (pos_weight=None)"
+    }
+  },
+  "seeds": [42, 21, 7],
+  "training": {
+    "batch_size": 64,
+    "max_epochs": 100,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "early_stopping_patience": 15,
+    "early_stopping_metric": "val_macro_roc_auc",
+    "lr_scheduler": {
+      "type": "ReduceLROnPlateau",
+      "mode": "max",
+      "factor": 0.5,
+      "patience": 5,
+      "min_lr": 1e-05
+    }
+  }
+}
+

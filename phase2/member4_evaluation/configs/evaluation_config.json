@@ -1,0 +1,41 @@
+{
+  "module_name": "member4_evaluation",
+  "version": "1.0.0",
+  "target_assays": [
+    "NR-AR",
+    "NR-AR-LBD",
+    "NR-AhR",
+    "NR-Aromatase",
+    "NR-ER",
+    "NR-ER-LBD",
+    "NR-PPAR-gamma",
+    "SR-ARE",
+    "SR-ATAD5",
+    "SR-HSE",
+    "SR-MMP",
+    "SR-p53"
+  ],
+  "split_contract": {
+    "name": "Split B Frozen Scaffold Split",
+    "train_count": 6259,
+    "val_count": 782,
+    "test_count": 782,
+    "total_count": 7823
+  },
+  "default_decision_threshold": 0.5,
+  "optimize_threshold_on_val": true,
+  "threshold_sweep_steps": 100,
+  "bootstrap_iterations": 1000,
+  "confidence_interval": 0.95,
+  "random_seeds": [42, 21, 7],
+  "metrics": [
+    "ROC-AUC",
+    "PR-AUC",
+    "F1-Score",
+    "Precision",
+    "Recall",
+    "Balanced Acc",
+    "MCC"
+  ]
+}
+

@@ -1,0 +1,39 @@
+{
+  "experiment_name": "dropout_ablation",
+  "feature_set": "combined",
+  "input_dim": 2053,
+  "hidden_dims": [512, 256],
+  "latent_dim": 128,
+  "num_endpoints": 12,
+  "activation": "relu",
+  "norm_type": "batch_norm",
+  "configurations": {
+    "original_dropout": {
+      "trunk_dropout": 0.35,
+      "bottleneck_dropout": 0.175,
+      "description": "Original architecture with 0.35 trunk dropout and 0.175 bottleneck dropout"
+    },
+    "no_dropout": {
+      "trunk_dropout": 0.0,
+      "bottleneck_dropout": 0.0,
+      "description": "Ablation architecture with 0.0 dropout throughout"
+    }
+  },
+  "seeds": [42, 21, 7],
+  "training": {
+    "batch_size": 64,
+    "max_epochs": 100,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "early_stopping_patience": 15,
+    "early_stopping_metric": "val_macro_roc_auc",
+    "lr_scheduler": {
+      "type": "ReduceLROnPlateau",
+      "mode": "max",
+      "factor": 0.5,
+      "patience": 5,
+      "min_lr": 1e-05
+    }
+  }
+}
+
