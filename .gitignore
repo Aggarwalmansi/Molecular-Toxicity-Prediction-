@@ -3,3 +3,5 @@ __pycache__/
 .DS_Store
 .venv/
 *viva*.md
+
+member3_hybrid_model/README.md
