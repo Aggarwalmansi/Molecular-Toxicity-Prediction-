@@ -1,0 +1,71 @@
+{
+  "audit_timestamp": "2026-11-14T16:07:03.250673",
+  "pipeline_status": "PASS",
+  "frozen_split": "Split_B_Certified_Handoff",
+  "verified_counts": {
+    "raw_molecules": 7831,
+    "excluded_molecules": 8,
+    "valid_molecules": 7823,
+    "split_counts": {
+      "train": 6259,
+      "validation": 782,
+      "test": 782
+    },
+    "acyclic_molecules": {
+      "total": 1775,
+      "train": 1775,
+      "validation": 0,
+      "test": 0
+    }
+  },
+  "leakage_and_integrity_checks": {
+    "molecule_id_leakage": {
+      "result": "PASS",
+      "overlaps": {
+        "train_val": 0,
+        "train_test": 0,
+        "val_test": 0
+      }
+    },
+    "scaffold_leakage": {
+      "result": "PASS",
+      "overlaps": {
+        "train_val": 0,
+        "train_test": 0,
+        "val_test": 0
+      }
+    },
+    "observed_equals_pos_plus_neg": {
+      "result": "PASS",
+      "checks_passed": "48/48"
+    },
+    "total_equals_obs_plus_miss": {
+      "result": "PASS",
+      "checks_passed": "48/48"
+    },
+    "evaluation_class_balance": {
+      "result": "PASS",
+      "min_positives_val": 24,
+      "min_positives_test": 21,
+      "zero_single_class_endpoints": true
+    },
+    "missing_label_preservation": {
+      "result": "PASS",
+      "total_missing_labels": 16012,
+      "zero_negative_imputation": true
+    },
+    "descriptor_scaler_training_only": {
+      "result": "PASS",
+      "fit_split": "train",
+      "fit_samples": 6259
+    }
+  },
+  "supported_feature_representations": {
+    "combined": 2053,
+    "morgan_filtered": 1011,
+    "descriptors_scaled": 5,
+    "morgan": 2048,
+    "descriptors_raw": 5,
+    "combined_raw": 2053
+  }
+}

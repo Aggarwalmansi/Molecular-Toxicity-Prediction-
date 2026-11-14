@@ -1,0 +1,5 @@
+# Phase 2 — Member 1: Minimal Data Pipeline Dependencies
+# Python >= 3.9
+numpy>=1.22.0
+pandas>=1.4.0
+pyarrow>=8.0.0

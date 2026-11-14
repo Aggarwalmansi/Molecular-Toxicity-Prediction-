@@ -1,0 +1,223 @@
+{
+  "split_name": "Split_B_Frozen_Scaffold_Split",
+  "version": "2.0.0",
+  "date_frozen": "2026-10-23",
+  "description": "Authoritative frozen Bemis-Murcko scaffold split for Phase 2 molecular toxicity modeling across 12 endpoints. Preserves certified handoff feature parquets.",
+  "source_artifacts": {
+    "corrected_scaffold_split.csv": {
+      "path": "tox21_member2_handoff/artifacts/corrected_scaffold_split.csv",
+      "sha256": "89a23c7c9d1559f8561aff5316696aff37ef558293f5af58d1f4d484479d2d01",
+      "size_bytes": 1179756,
+      "rows": 7823
+    },
+    "labels_and_splits.parquet": {
+      "path": "tox21_member2_handoff/artifacts/labels_and_splits.parquet",
+      "sha256": "b62a2bc92c2bfa572d1f157ebd49a7b12819eec0b616c9bc52c9cda1f2aba1ab",
+      "size_bytes": 460691,
+      "rows": 7823
+    },
+    "X_combined.parquet": {
+      "path": "tox21_member2_handoff/artifacts/X_combined.parquet",
+      "sha256": "05e03718a2a02c0731b7742ddba05b72db6551a519bc1e81d46e1d72ca6dfb09",
+      "size_bytes": 1961916,
+      "n_features": 2053
+    },
+    "X_descriptors_scaled.parquet": {
+      "path": "tox21_member2_handoff/artifacts/X_descriptors_scaled.parquet",
+      "sha256": "50d492dd0091c9bf588dce5d7bb5146aa3e76a23ca334d0713accdd3e582846b",
+      "size_bytes": 228336,
+      "n_features": 5
+    },
+    "X_morgan_unsupervised_filtered.parquet": {
+      "path": "tox21_member2_handoff/artifacts/X_morgan_unsupervised_filtered.parquet",
+      "sha256": "c7c520f2ee94fe14c729cce4ed7a89627433bb403ba132353bc74c57543631ce",
+      "size_bytes": 975994,
+      "n_features": 1011
+    },
+    "scaler_descriptors.json": {
+      "path": "tox21_member2_handoff/artifacts/scaler_descriptors.json",
+      "sha256": "6ffacea514d4c7c31b8a5cfebeadcd20e572902629b304c45b8cb96ec4ba5830",
+      "size_bytes": 428
+    }
+  },
+  "dataset_statistics": {
+    "raw_total_molecules": 7831,
+    "excluded_molecules": 8,
+    "valid_molecules": 7823,
+    "partitions": {
+      "train": {
+        "count": 6259,
+        "percentage": 80.00767
+      },
+      "validation": {
+        "count": 782,
+        "percentage": 9.99617
+      },
+      "test": {
+        "count": 782,
+        "percentage": 9.99617
+      }
+    },
+    "acyclic_distribution": {
+      "total_acyclic": 1775,
+      "train": 1775,
+      "validation": 0,
+      "test": 0,
+      "scientific_note": "Acyclic compounds were consolidated into a single partition (__ACYCLIC__) in Split B. As a result, validation and test partitions evaluate out-of-distribution cyclic and heterocyclic scaffold generalization only. Models are not evaluated on acyclic chemotypes in holdout test."
+    }
+  },
+  "endpoints": {
+    "count": 12,
+    "target_assays": [
+      "NR-AR",
+      "NR-AR-LBD",
+      "NR-AhR",
+      "NR-Aromatase",
+      "NR-ER",
+      "NR-ER-LBD",
+      "NR-PPAR-gamma",
+      "SR-ARE",
+      "SR-ATAD5",
+      "SR-HSE",
+      "SR-MMP",
+      "SR-p53"
+    ],
+    "endpoint_metadata": {
+      "NR-AR": {
+        "full_name": "Androgen Receptor",
+        "family": "Nuclear Receptor",
+        "train_observed": 5853,
+        "train_positives": 233,
+        "train_negatives": 5620,
+        "positive_class_weight": 24.120171673819744
+      },
+      "NR-AR-LBD": {
+        "full_name": "Androgen Receptor (Ligand Binding Domain)",
+        "family": "Nuclear Receptor",
+        "train_observed": 5504,
+        "train_positives": 190,
+        "train_negatives": 5314,
+        "positive_class_weight": 27.96842105263158
+      },
+      "NR-AhR": {
+        "full_name": "Aryl Hydrocarbon Receptor",
+        "family": "Nuclear Receptor",
+        "train_observed": 5314,
+        "train_positives": 583,
+        "train_negatives": 4731,
+        "positive_class_weight": 8.11492281303602
+      },
+      "NR-Aromatase": {
+        "full_name": "Aromatase Enzyme (CYP19A1)",
+        "family": "Nuclear Receptor",
+        "train_observed": 4799,
+        "train_positives": 206,
+        "train_negatives": 4593,
+        "positive_class_weight": 22.29611650485437
+      },
+      "NR-ER": {
+        "full_name": "Estrogen Receptor (Full Length)",
+        "family": "Nuclear Receptor",
+        "train_observed": 5089,
+        "train_positives": 629,
+        "train_negatives": 4460,
+        "positive_class_weight": 7.0906200317965025
+      },
+      "NR-ER-LBD": {
+        "full_name": "Estrogen Receptor (Ligand Binding Domain)",
+        "family": "Nuclear Receptor",
+        "train_observed": 5641,
+        "train_positives": 289,
+        "train_negatives": 5352,
+        "positive_class_weight": 18.51903114186851
+      },
+      "NR-PPAR-gamma": {
+        "full_name": "Peroxisome Proliferator-Activated Receptor gamma",
+        "family": "Nuclear Receptor",
+        "train_observed": 5300,
+        "train_positives": 133,
+        "train_negatives": 5167,
+        "positive_class_weight": 38.849624060150376
+      },
+      "SR-ARE": {
+        "full_name": "Antioxidant Response Element (Nrf2)",
+        "family": "Stress Response",
+        "train_observed": 4856,
+        "train_positives": 724,
+        "train_negatives": 4132,
+        "positive_class_weight": 5.707182320441989
+      },
+      "SR-ATAD5": {
+        "full_name": "DNA Damage Response (ATAD5)",
+        "family": "Stress Response",
+        "train_observed": 5741,
+        "train_positives": 192,
+        "train_negatives": 5549,
+        "positive_class_weight": 28.901041666666668
+      },
+      "SR-HSE": {
+        "full_name": "Heat Shock Response Element",
+        "family": "Stress Response",
+        "train_observed": 5314,
+        "train_positives": 282,
+        "train_negatives": 5032,
+        "positive_class_weight": 17.843971631205672
+      },
+      "SR-MMP": {
+        "full_name": "Mitochondrial Membrane Potential Disruption",
+        "family": "Stress Response",
+        "train_observed": 4792,
+        "train_positives": 712,
+        "train_negatives": 4080,
+        "positive_class_weight": 5.730337078651685
+      },
+      "SR-p53": {
+        "full_name": "p53 Tumor Suppressor Pathway",
+        "family": "Stress Response",
+        "train_observed": 5517,
+        "train_positives": 285,
+        "train_negatives": 5232,
+        "positive_class_weight": 18.357894736842106
+      }
+    }
+  },
+  "feature_spaces": {
+    "combined": {
+      "dimensions": 2053,
+      "description": "2,048 binary Morgan fingerprint bits (radius=2) + 5 training-standardized continuous physicochemical descriptors. Primary canonical input for Member 2 DL model.",
+      "artifact_file": "X_combined.parquet"
+    },
+    "morgan_filtered": {
+      "dimensions": 1011,
+      "description": "1,011 high-variance Morgan fingerprint bits selected via training variance threshold (Var >= 0.005).",
+      "artifact_file": "X_morgan_unsupervised_filtered.parquet"
+    },
+    "descriptors_scaled": {
+      "dimensions": 5,
+      "description": "5 continuous descriptors (MolWt, TPSA, MolLogP, NumHDonors, NumHAcceptors) standardized strictly on training partition.",
+      "artifact_file": "X_descriptors_scaled.parquet"
+    },
+    "morgan": {
+      "dimensions": 2048,
+      "description": "2,048 binary Morgan fingerprint bits (ECFP4-like).",
+      "artifact_file": "X_morgan.parquet"
+    },
+    "descriptors_raw": {
+      "dimensions": 5,
+      "description": "5 unscaled continuous descriptors.",
+      "artifact_file": "X_descriptors_raw.parquet"
+    },
+    "combined_raw": {
+      "dimensions": 2053,
+      "description": "2,048 Morgan bits + 5 unscaled continuous descriptors.",
+      "artifact_file": "X_combined_raw.parquet"
+    }
+  },
+  "descriptor_scaling": {
+    "fit_split": "train",
+    "n_samples": 6259,
+    "feature_names": ["MolWt", "TPSA", "MolLogP", "NumHDonors", "NumHAcceptors"],
+    "means": [251.0806128152529, 54.185096660808654, 2.2645048697875163, 1.1211056079245887, 3.1092826330084677],
+    "stds": [144.61879916802874, 50.28909841092117, 2.222990626477171, 1.6387328246792663, 2.7250077335579426]
+  }
+}
