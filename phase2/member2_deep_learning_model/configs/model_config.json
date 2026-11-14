@@ -1,0 +1,43 @@
+{
+  "model_name": "MultiTaskToxicNet",
+  "version": "1.0.0",
+  "feature_set": "combined",
+  "input_dim": 2053,
+  "hidden_dims": [512, 256],
+  "latent_dim": 128,
+  "num_endpoints": 12,
+  "activation": "relu",
+  "norm_type": "batch_norm",
+  "dropout": 0.35,
+  "use_residual": false,
+  "training": {
+    "batch_size": 64,
+    "max_epochs": 100,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "early_stopping_patience": 15,
+    "early_stopping_metric": "val_macro_roc_auc",
+    "lr_scheduler": {
+      "type": "ReduceLROnPlateau",
+      "mode": "min",
+      "factor": 0.5,
+      "patience": 5,
+      "min_lr": 1e-05
+    },
+    "seed": 42
+  },
+  "target_assays": [
+    "NR-AR",
+    "NR-AR-LBD",
+    "NR-AhR",
+    "NR-Aromatase",
+    "NR-ER",
+    "NR-ER-LBD",
+    "NR-PPAR-gamma",
+    "SR-ARE",
+    "SR-ATAD5",
+    "SR-HSE",
+    "SR-MMP",
+    "SR-p53"
+  ]
+}
