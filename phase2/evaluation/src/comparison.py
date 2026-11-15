@@ -25,6 +25,7 @@ from phase2.data.src.data_loader import Tox21DataLoader, TARGET_ASSAYS
 from .data_utils import Tox21DataLoaderWrapper
 from .metrics import compute_classification_metrics
 from .prediction_loader import PredictionLoader
+from phase2.data.src.data_loader import METRICS_DIR
 
 os.environ["MPLCONFIGDIR"] = "/tmp/mplconfig"
 
@@ -45,7 +46,7 @@ class ConsolidatedModelComparison:
         self.wrapper = Tox21DataLoaderWrapper()
         self.loader = self.wrapper.loader
         self.target_assays = list(TARGET_ASSAYS)
-        self.results_dir = self.output_dir / "results"
+        self.results_dir = METRICS_DIR
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
     def load_completed_experiment_results(self) -> Dict[str, pd.DataFrame]:

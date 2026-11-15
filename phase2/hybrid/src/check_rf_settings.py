@@ -24,6 +24,7 @@ from phase2.data.src.data_loader import Tox21DataLoader
 from phase2.hybrid.src.evaluate_hybrid import evaluate_predictions
 from phase2.hybrid.src.hybrid_features import build_hybrid_features
 from phase2.hybrid.src.hybrid_model import get_module_dir
+from phase2.data.src.data_loader import METRICS_DIR
 
 # Settings to try. The first one matches the Phase 1 baseline exactly.
 SETTINGS_TO_TRY = [
@@ -106,7 +107,7 @@ def main():
         print("Even the best hybrid setting stays below the standalone Random Forest,")
         print("so the gap is caused by the features, not by the forest settings.")
 
-    output_file = get_module_dir() / "reports" / "rf_settings_check.csv"
+    output_file = METRICS_DIR / "hybrid_rf_settings_check.csv"
     pd.DataFrame(rows).to_csv(output_file, index=False)
     print(f"\nSaved to {output_file.name}")
 

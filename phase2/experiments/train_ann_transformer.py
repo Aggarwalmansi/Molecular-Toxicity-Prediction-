@@ -39,11 +39,10 @@ from phase2.experiments.ann_transformer import AnnTransformerHybrid
 from phase2.experiments.smiles_tokenizer import build_vocabulary, encode_many, split_smiles
 from phase2.data.src.data_loader import TARGET_ASSAYS, Tox21DataLoader
 from phase2.deep_learning.src.loss import MaskedWeightedBCEWithLogitsLoss
+from phase2.data.src.data_loader import METRICS_DIR, PREDICTIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPLIT_FILE = PROJECT_ROOT / "tox21_member2_handoff" / "artifacts" / "corrected_scaffold_split.csv"
-RESULTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "results"
-PREDICTIONS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "predictions"
 CHECKPOINT_DIR = PROJECT_ROOT / "phase2" / "experiments" / "checkpoints"
 
 MAX_LENGTH = 128        # covers about 99% of molecules without cutting
@@ -205,7 +204,7 @@ def train_one_model(data, vocabulary, use_fingerprints, use_smiles, seed, class_
 
 
 def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
     PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -221,7 +220,7 @@ def main():
     print(f"Molecules longer than {MAX_LENGTH} tokens: "
           f"{sum(1 for n in token_lengths if n > MAX_LENGTH)} of {len(token_lengths)}")
 
-    with open(RESULTS_DIR / "smiles_vocabulary.json", "w", encoding="utf-8") as handle:
+    with open(METRICS_DIR / "smiles_vocabulary.json", "w", encoding="utf-8") as handle:
         json.dump(vocabulary, handle, indent=2)
 
     data = build_tensors(loader, smiles_by_split, vocabulary)
@@ -296,8 +295,8 @@ def main():
                   f"val {val_score:.4f}  test {test_score:.4f}  ({elapsed/60:.1f} min)")
 
     summary = pd.DataFrame(summary_rows)
-    summary.to_csv(RESULTS_DIR / "ann_transformer_runs.csv", index=False)
-    pd.DataFrame(history_rows).to_csv(RESULTS_DIR / "ann_transformer_history.csv", index=False)
+    summary.to_csv(METRICS_DIR / "ann_transformer_runs.csv", index=False)
+    pd.DataFrame(history_rows).to_csv(METRICS_DIR / "ann_transformer_history.csv", index=False)
     pd.concat(prediction_rows, ignore_index=True).to_parquet(
         PREDICTIONS_DIR / "ann_transformer_predictions.parquet", index=False
     )
@@ -308,7 +307,7 @@ def main():
         test_mean=("test_roc_auc", "mean"),
         test_std=("test_roc_auc", "std"),
     ).round(4)
-    grouped.to_csv(RESULTS_DIR / "ann_transformer_summary.csv")
+    grouped.to_csv(METRICS_DIR / "ann_transformer_summary.csv")
 
     print()
     print("Mean +/- standard deviation over three seeds:")

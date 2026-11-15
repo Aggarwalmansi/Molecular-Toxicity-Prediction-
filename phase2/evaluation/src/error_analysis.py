@@ -27,6 +27,7 @@ from phase2.data.src.data_loader import Tox21DataLoader, TARGET_ASSAYS, DESCRIPT
 from .data_utils import Tox21DataLoaderWrapper
 from .metrics import compute_classification_metrics, find_optimal_threshold
 from .prediction_loader import PredictionLoader
+from phase2.data.src.data_loader import DOCS_DIR, METRICS_DIR, PLOTS_DIR
 
 os.environ["MPLCONFIGDIR"] = "/tmp/mplconfig"
 
@@ -49,9 +50,9 @@ class ComprehensiveErrorAnalysis:
         self.pred_loader = PredictionLoader(self.loader)
         self.target_assays = list(TARGET_ASSAYS)
 
-        self.results_dir = self.output_dir / "results"
-        self.plot_dir = self.output_dir / "plots" / "error_analysis"
-        self.reports_dir = self.output_dir / "reports"
+        self.results_dir = METRICS_DIR
+        self.plot_dir = PLOTS_DIR
+        self.reports_dir = DOCS_DIR
 
         for d in [self.results_dir, self.plot_dir, self.reports_dir]:
             d.mkdir(parents=True, exist_ok=True)

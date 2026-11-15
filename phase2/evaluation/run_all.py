@@ -33,6 +33,7 @@ from phase2.evaluation.src.multitask_vs_single_task import MultitaskVsSingleTask
 from phase2.evaluation.src.error_analysis import ComprehensiveErrorAnalysis
 from phase2.evaluation.src.comparison import ConsolidatedModelComparison
 from phase2.evaluation.src.visualization import PublicationVisualizer
+from phase2.data.src.data_loader import DOCS_DIR, METRICS_DIR, PLOTS_DIR
 
 
 def run_pipeline(stages: List[str]):
@@ -101,9 +102,9 @@ def run_pipeline(stages: List[str]):
     elapsed = time.time() - start_time
     print("\n" + "=" * 75)
     print(f"ALL MEMBER 4 WORK COMPLETED SUCCESSFULLY IN {elapsed:.1f} SECONDS!")
-    print(f"Results written to: {base_dir / 'results'}")
-    print(f"Plots written to:   {base_dir / 'plots'}")
-    print(f"Reports written to: {base_dir / 'reports'}")
+    print(f"Results written to: {METRICS_DIR}")
+    print(f"Plots written to:   {PLOTS_DIR}")
+    print(f"Reports written to: {DOCS_DIR}")
     print("=" * 75 + "\n")
 
 

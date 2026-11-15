@@ -100,6 +100,15 @@ def find_project_root() -> Path:
     return current.parent.parent.parent
 
 
+# All Phase 2 output goes to these three folders and nowhere else. Every
+# script imports them from here so there is a single place to look.
+PHASE2_RESULTS_DIR = find_project_root() / "phase2" / "results"
+METRICS_DIR = PHASE2_RESULTS_DIR / "metrics"
+PLOTS_DIR = PHASE2_RESULTS_DIR / "plots"
+PREDICTIONS_DIR = PHASE2_RESULTS_DIR / "predictions"
+DOCS_DIR = find_project_root() / "docs"
+
+
 class Tox21DataLoader:
     """
     Certified Data Pipeline Loader for Tox21 Phase 2.

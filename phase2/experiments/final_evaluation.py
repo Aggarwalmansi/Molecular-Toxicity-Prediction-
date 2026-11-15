@@ -38,9 +38,9 @@ from phase2.experiments.ensemble import (
     load_predictions,
     make_wide,
 )
+from phase2.data.src.data_loader import METRICS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RESULTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "results"
 
 
 def score_all_metrics(wide, score_column, thresholds=None):
@@ -141,7 +141,7 @@ def get_candidates(val, test):
 
 
 def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
     predictions = load_predictions()
     val = make_wide(predictions, "val")
     test = make_wide(predictions, "test")
@@ -193,10 +193,10 @@ def main():
     fixed = pd.DataFrame(fixed_rows)
     tuned = pd.DataFrame(tuned_rows)
 
-    fixed.to_csv(RESULTS_DIR / "final_comparison_fixed_threshold.csv", index=False)
-    tuned.to_csv(RESULTS_DIR / "final_comparison_tuned_threshold.csv", index=False)
+    fixed.to_csv(METRICS_DIR / "final_comparison_fixed_threshold.csv", index=False)
+    tuned.to_csv(METRICS_DIR / "final_comparison_tuned_threshold.csv", index=False)
     pd.concat(per_endpoint_tables).to_csv(
-        RESULTS_DIR / "final_per_endpoint_tuned.csv", index=False
+        METRICS_DIR / "final_per_endpoint_tuned.csv", index=False
     )
 
     print("=" * 96)

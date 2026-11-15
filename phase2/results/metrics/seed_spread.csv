@@ -1,0 +1,7 @@
+configuration,seeds,val_roc_mean,val_roc_std,test_roc_mean,test_roc_std
+dl_weighted,3,0.7877,0.0049,0.7471,0.0065
+dl_no_dropout,3,0.7862,0.0105,0.7476,0.0036
+dl_unweighted,3,0.7842,0.0054,0.7484,0.0105
+ann_transformer_hybrid,3,0.7824,0.0008,0.7339,0.0117
+ann_only,3,0.7762,0.009,0.7211,0.0093
+smiles_only,3,0.7437,0.0079,0.7344,0.0153

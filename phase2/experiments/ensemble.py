@@ -28,10 +28,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
+from phase2.data.src.data_loader import METRICS_DIR, PREDICTIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PREDICTIONS_FILE = PROJECT_ROOT / "phase2" / "experiments" / "predictions" / "val_test_predictions.parquet"
-RESULTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "results"
+PREDICTIONS_FILE = PREDICTIONS_DIR / "val_test_predictions.parquet"
 
 # The six runs of the same architecture that Member 4 produced.
 DL_SIX_RUNS = [
@@ -123,7 +123,7 @@ def blend(wide, columns, weights=None, use_ranks=False):
 
 
 def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
     predictions = load_predictions()
 
     val = make_wide(predictions, "val")
@@ -173,7 +173,7 @@ def main():
     all_candidates = pd.DataFrame(individual_rows + rows).sort_values(
         "val_roc_auc", ascending=False
     )
-    all_candidates.to_csv(RESULTS_DIR / "ensemble_validation_selection.csv", index=False)
+    all_candidates.to_csv(METRICS_DIR / "ensemble_validation_selection.csv", index=False)
 
     best_name = all_candidates.iloc[0]["candidate"]
     print()
@@ -207,7 +207,7 @@ def main():
         )
 
     final = pd.DataFrame(final_rows).drop_duplicates(subset=["model"])
-    final.to_csv(RESULTS_DIR / "ensemble_final.csv", index=False)
+    final.to_csv(METRICS_DIR / "ensemble_final.csv", index=False)
     print(final.to_string(index=False))
 
     # Save the winning ensemble's test predictions so later steps can reuse them
@@ -222,7 +222,7 @@ def main():
     )[["mol_id", "endpoint", "split", "blend_score", "true_label", "observed"]]
     saved = saved.rename(columns={"blend_score": "predicted_prob"})
     saved["model"] = best_name
-    saved.to_parquet(RESULTS_DIR / "best_ensemble_predictions.parquet", index=False)
+    saved.to_parquet(METRICS_DIR / "best_ensemble_predictions.parquet", index=False)
     print()
     print(f"Saved winning ensemble predictions ({best_name}) for reuse.")
 

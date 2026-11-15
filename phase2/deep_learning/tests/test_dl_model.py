@@ -22,6 +22,7 @@ import torch
 from phase2.data.src.data_loader import Tox21DataLoader
 from phase2.deep_learning.src.model import MultiTaskToxicNet
 from phase2.deep_learning.src.loss import MaskedWeightedBCEWithLogitsLoss
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR
 
 
 class TestMultiTaskToxicNet(unittest.TestCase):
@@ -178,9 +179,8 @@ class TestMultiTaskToxicNet(unittest.TestCase):
     def test_09_test_evaluation_report_completeness(self):
         """Verify test_evaluation.csv contains all 12 endpoints and MACRO AVERAGE row."""
         import pandas as pd
-        base_dir = Path(__file__).resolve().parent.parent
-        csv_path = base_dir / "reports" / "test_evaluation.csv"
-        self.assertTrue(csv_path.exists(), "test_evaluation.csv missing")
+        csv_path = METRICS_DIR / "deep_learning_test_evaluation.csv"
+        self.assertTrue(csv_path.exists(), "deep_learning_test_evaluation.csv missing")
 
         df = pd.read_csv(csv_path)
         self.assertEqual(len(df), 13)  # 12 endpoints + 1 MACRO AVERAGE row
@@ -189,11 +189,10 @@ class TestMultiTaskToxicNet(unittest.TestCase):
 
     def test_10_plots_exist(self):
         """Verify generated diagnostic plots exist."""
-        base_dir = Path(__file__).resolve().parent.parent
-        plot_dir = base_dir / "reports" / "plots"
-        self.assertTrue((plot_dir / "loss_curve.png").exists())
-        self.assertTrue((plot_dir / "val_metrics_curve.png").exists())
-        self.assertTrue((plot_dir / "per_endpoint_roc_pr.png").exists())
+        for name in ["deep_learning_loss_curve.png",
+                     "deep_learning_val_metrics_curve.png",
+                     "deep_learning_per_endpoint_roc_pr.png"]:
+            self.assertTrue((PLOTS_DIR / name).exists(), f"missing plot: {name}")
 
 
 if __name__ == "__main__":

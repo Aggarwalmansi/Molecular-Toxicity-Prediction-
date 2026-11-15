@@ -27,6 +27,7 @@ from .data_utils import set_seed, Tox21DataLoaderWrapper
 from .metrics import compute_classification_metrics, evaluate_multitask_predictions
 from .single_task_model import SingleTaskToxicNet, SingleTaskTrainer
 from .dropout_ablation import DropoutAblationStudy
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR, PREDICTIONS_DIR
 
 os.environ["MPLCONFIGDIR"] = "/tmp/mplconfig"
 
@@ -58,9 +59,9 @@ class MultitaskVsSingleTaskStudy:
 
         # Prepare directories
         self.ckpt_dir = self.output_dir / "checkpoints" / "single_task"
-        self.pred_dir = self.output_dir / "predictions" / "multitask_single_task"
-        self.results_dir = self.output_dir / "results"
-        self.plot_dir = self.output_dir / "plots" / "multitask_single_task"
+        self.pred_dir = PREDICTIONS_DIR
+        self.results_dir = METRICS_DIR
+        self.plot_dir = PLOTS_DIR
 
         for d in [self.ckpt_dir, self.pred_dir, self.results_dir, self.plot_dir]:
             d.mkdir(parents=True, exist_ok=True)

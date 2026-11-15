@@ -40,10 +40,9 @@ from phase2.experiments.final_evaluation import (
     choose_thresholds_on_validation,
     score_all_metrics,
 )
+from phase2.data.src.data_loader import METRICS_DIR, PREDICTIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PREDICTIONS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "predictions"
-RESULTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "results"
 
 PREDICTION_FILES = [
     "val_test_predictions.parquet",
@@ -370,7 +369,7 @@ def full_metrics(val_table, test_table, column, label):
 
 
 def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
     val, test = load_wide_tables()
 
     all_models = sorted(
@@ -384,7 +383,7 @@ def main():
     print("A1: HOW TO COMBINE — RANKS, RAW PROBABILITIES, OR CALIBRATED ONES")
     print("=" * 74)
     a1 = run_a1_combination_method(val)
-    a1.to_csv(RESULTS_DIR / "a1_combination_method.csv", index=False)
+    a1.to_csv(METRICS_DIR / "a1_combination_method.csv", index=False)
     print(a1.to_string(index=False))
 
     # A1's winner is carried into every later step.
@@ -400,7 +399,7 @@ def main():
     print("A2: CHOOSING THE RANDOM FOREST WEIGHT ON PR-AUC, NOT ONLY ROC-AUC")
     print("=" * 74)
     a2, weight_choices = run_a2_weight_search(val, BASE_MEMBERS, use_ranks, calibrated)
-    a2.to_csv(RESULTS_DIR / "a2_weight_search.csv", index=False)
+    a2.to_csv(METRICS_DIR / "a2_weight_search.csv", index=False)
     print(a2.to_string(index=False))
     print()
     for criterion, weight in weight_choices.items():
@@ -415,7 +414,7 @@ def main():
     a3, final_members = run_a3_extra_members(
         val, BASE_MEMBERS, rf_weight, use_ranks, calibrated
     )
-    a3.to_csv(RESULTS_DIR / "a3_extra_members.csv", index=False)
+    a3.to_csv(METRICS_DIR / "a3_extra_members.csv", index=False)
     print(a3.to_string(index=False))
     print()
     print(f"  members kept: {len(final_members)}")
@@ -431,7 +430,7 @@ def main():
     print("A4: ONE MODEL PER ENDPOINT, CHOSEN ON VALIDATION")
     print("=" * 74)
     a4 = run_a4_per_endpoint(val, candidates)
-    a4.to_csv(RESULTS_DIR / "a4_per_endpoint_choice.csv", index=False)
+    a4.to_csv(METRICS_DIR / "a4_per_endpoint_choice.csv", index=False)
     print(a4.to_string(index=False))
     choice_by_endpoint = dict(zip(a4["endpoint"], a4["chosen_model"]))
 
@@ -450,7 +449,7 @@ def main():
         rows.append(full_metrics(val_table, test_table, column, name))
 
     comparison = pd.DataFrame(rows).sort_values("val_pr_auc", ascending=False)
-    comparison.to_csv(RESULTS_DIR / "improved_comparison.csv", index=False)
+    comparison.to_csv(METRICS_DIR / "improved_comparison.csv", index=False)
     print(comparison.to_string(index=False))
 
     baseline = comparison[comparison["model"] == "rf_phase1"].iloc[0]
@@ -485,7 +484,7 @@ def save_recommended(val, test, candidates, chosen):
     phase1["model"] = "rf_phase1"
 
     combined = pd.concat([phase1, per_endpoint], ignore_index=True)
-    combined.to_csv(RESULTS_DIR / "recommended_per_endpoint.csv", index=False)
+    combined.to_csv(METRICS_DIR / "recommended_per_endpoint.csv", index=False)
 
     side_by_side = combined.pivot(index="endpoint", columns="model",
                                   values=["roc_auc", "pr_auc"]).round(4)
@@ -497,7 +496,7 @@ def save_recommended(val, test, candidates, chosen):
         ignore_index=True,
     ).rename(columns={column: "predicted_prob"})
     saved["model"] = chosen
-    saved.to_parquet(RESULTS_DIR / "recommended_model_predictions.parquet", index=False)
+    saved.to_parquet(METRICS_DIR / "recommended_model_predictions.parquet", index=False)
     print()
     print(f"Saved {chosen} predictions and per-endpoint scores.")
 

@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR
 
 os.environ["MPLCONFIGDIR"] = "/tmp/mplconfig"
 
@@ -60,8 +61,8 @@ class PublicationVisualizer:
         base_dir = Path(__file__).resolve().parent.parent
         self.base_dir = base_dir
         self.output_dir = Path(output_dir or base_dir)
-        self.results_dir = self.output_dir / "results"
-        self.plot_dir = self.output_dir / "plots" / "model_comparison"
+        self.results_dir = METRICS_DIR
+        self.plot_dir = PLOTS_DIR
         self.plot_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_all_plots(self):

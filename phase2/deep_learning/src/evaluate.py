@@ -28,6 +28,7 @@ import torch
 
 from phase2.data.src.data_loader import TARGET_ASSAYS
 from .model import MultiTaskToxicNet
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR
 
 
 def evaluate_multitask_model(
@@ -68,8 +69,8 @@ def evaluate_multitask_model(
             device = torch.device("cpu")
 
     base_dir = Path(__file__).resolve().parent.parent
-    report_dir = Path(output_dir or (base_dir / "reports"))
-    plot_dir = report_dir / "plots"
+    report_dir = Path(output_dir or METRICS_DIR)
+    plot_dir = PLOTS_DIR
     report_dir.mkdir(parents=True, exist_ok=True)
     plot_dir.mkdir(parents=True, exist_ok=True)
 

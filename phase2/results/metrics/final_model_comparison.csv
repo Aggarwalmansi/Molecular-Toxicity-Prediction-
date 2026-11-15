@@ -1,0 +1,5 @@
+category,model,val_roc_auc,val_pr_auc,test_roc_auc,test_pr_auc,test_precision,test_recall,test_f1,test_mcc
+standalone_ml,rf_phase1,0.7978,0.4661,0.7541,0.3962,0.4627,0.3703,0.3979,0.3394
+standalone_dl,dl_member2_checkpoint,0.7966,0.4029,0.7318,0.3419,0.3486,0.4236,0.3536,0.2786
+feature_hybrid,fh_corrected_emb_extratrees,0.7913,0.4153,0.7294,0.3527,0.4064,0.4019,0.3634,0.2996
+prediction_ensemble,rf_plus_dl6_rank_w3,0.8191,0.4564,0.7779,0.3903,0.4233,0.4509,0.4,0.3385

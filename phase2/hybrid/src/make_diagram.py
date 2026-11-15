@@ -16,6 +16,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 from phase2.hybrid.src.hybrid_model import get_module_dir
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR
 
 # Colours: blue for Member 2's frozen deep learning parts, orange for Member 3's work
 DL_COLOUR = "#aacfe8"
@@ -112,7 +113,7 @@ def main():
               "whose label for that endpoint was measured",
               ha="center", fontsize=8.5)
 
-    output_dir = get_module_dir() / "reports" / "plots"
+    output_dir = PLOTS_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / "hybrid_architecture.png"
     plt.savefig(output_file, dpi=160, bbox_inches="tight", facecolor="white")
@@ -131,12 +132,12 @@ def make_comparison_plot(output_dir):
     """
     import pandas as pd
 
-    reports_dir = get_module_dir() / "reports"
+    reports_dir = METRICS_DIR
     figure, axes = plt.subplots(2, 1, figsize=(12, 9))
 
     for axis, metric, filename in [
-        (axes[0], "ROC-AUC", "comparison_roc_auc.csv"),
-        (axes[1], "PR-AUC", "comparison_pr_auc.csv"),
+        (axes[0], "ROC-AUC", "hybrid_comparison_roc_auc.csv"),
+        (axes[1], "PR-AUC", "hybrid_comparison_pr_auc.csv"),
     ]:
         table = pd.read_csv(reports_dir / filename, index_col=0)
         endpoints = [name for name in table.index if name != "MACRO AVERAGE"]

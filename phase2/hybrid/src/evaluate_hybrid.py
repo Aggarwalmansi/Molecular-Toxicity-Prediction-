@@ -32,6 +32,7 @@ from sklearn.metrics import (
 )
 
 from .hybrid_model import TARGET_ASSAYS, get_module_dir
+from phase2.data.src.data_loader import METRICS_DIR
 
 
 def get_project_root():
@@ -125,13 +126,7 @@ def load_standalone_rf_results():
 
 def load_standalone_dl_results():
     """Reads Member 2's test results, dropping their macro average row."""
-    results_file = (
-        get_project_root()
-        / "phase2"
-        / "deep_learning"
-        / "reports"
-        / "test_evaluation.csv"
-    )
+    results_file = METRICS_DIR / "deep_learning_test_evaluation.csv"
     dl_results = pd.read_csv(results_file)
     return dl_results[dl_results["Endpoint"] != "MACRO AVERAGE"].reset_index(drop=True)
 

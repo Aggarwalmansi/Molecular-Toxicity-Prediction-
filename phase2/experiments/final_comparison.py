@@ -37,11 +37,9 @@ from phase2.experiments.final_evaluation import (
     choose_thresholds_on_validation,
     score_all_metrics,
 )
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR, PREDICTIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PREDICTIONS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "predictions"
-RESULTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "results"
-PLOTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "plots"
 
 PREDICTION_FILES = [
     "val_test_predictions.parquet",
@@ -260,7 +258,7 @@ def make_plots(comparison, per_endpoint, spread):
 
 
 def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
     predictions = load_all_predictions()
     val = make_wide(predictions, "val")
     test = make_wide(predictions, "test")
@@ -288,7 +286,7 @@ def main():
 
     pd.concat(selection_tables, ignore_index=True)[
         ["category", "candidate", "val_roc_auc", "val_pr_auc"]
-    ].to_csv(RESULTS_DIR / "validation_selection_all_candidates.csv", index=False)
+    ].to_csv(METRICS_DIR / "validation_selection_all_candidates.csv", index=False)
 
     print()
     print("=" * 78)
@@ -315,10 +313,10 @@ def main():
         "test_recall", "test_f1", "test_mcc",
     ]
     comparison = pd.DataFrame(comparison_rows)[column_order]
-    comparison.to_csv(RESULTS_DIR / "final_model_comparison.csv", index=False)
+    comparison.to_csv(METRICS_DIR / "final_model_comparison.csv", index=False)
 
     per_endpoint = pd.concat(per_endpoint_tables, ignore_index=True)
-    per_endpoint.to_csv(RESULTS_DIR / "final_per_endpoint_comparison.csv", index=False)
+    per_endpoint.to_csv(METRICS_DIR / "final_per_endpoint_comparison.csv", index=False)
 
     print(comparison.to_string(index=False))
     print()
@@ -330,7 +328,7 @@ def main():
     print("STEP 3: SEED SPREAD — HOW BIG A GAP IS ACTUALLY MEANINGFUL")
     print("=" * 78)
     spread = seed_spread(val, test, predictions)
-    spread.to_csv(RESULTS_DIR / "seed_spread.csv", index=False)
+    spread.to_csv(METRICS_DIR / "seed_spread.csv", index=False)
     print(spread.to_string(index=False))
 
     print()

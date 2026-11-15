@@ -32,9 +32,9 @@ from sklearn.tree import DecisionTreeClassifier
 from phase2.data.src.data_loader import Tox21DataLoader
 from phase2.deep_learning.src.model import MultiTaskToxicNet
 from phase2.hybrid.src.hybrid_model import TARGET_ASSAYS
+from phase2.data.src.data_loader import PREDICTIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-OUTPUT_DIR = PROJECT_ROOT / "phase2" / "experiments" / "predictions"
 SPLITS = ["val", "test"]
 
 
@@ -186,7 +186,7 @@ def add_phase1_baselines():
     their own file, so the eleven predictions that already exist are left
     alone rather than regenerated.
     """
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
     loader = Tox21DataLoader()
 
     tables = []
@@ -195,7 +195,7 @@ def add_phase1_baselines():
         probabilities = predict_with_phase1_baseline(kind, loader)
         tables.append(build_long_table(probabilities, model_name, loader))
 
-    output_file = OUTPUT_DIR / "phase1_baseline_predictions.parquet"
+    output_file = PREDICTIONS_DIR / "phase1_baseline_predictions.parquet"
     pd.concat(tables, ignore_index=True).to_parquet(output_file, index=False)
     print(f"  saved {output_file.name}")
 
@@ -235,7 +235,7 @@ def get_network_runs():
 
 
 def main():
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
     loader = Tox21DataLoader()
 
     all_tables = []
@@ -256,7 +256,7 @@ def main():
 
     predictions = pd.concat(all_tables, ignore_index=True)
 
-    output_file = OUTPUT_DIR / "val_test_predictions.parquet"
+    output_file = PREDICTIONS_DIR / "val_test_predictions.parquet"
     predictions.to_parquet(output_file, index=False)
 
     print()

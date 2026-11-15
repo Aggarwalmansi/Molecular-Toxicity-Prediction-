@@ -22,6 +22,7 @@ from phase2.evaluation.src.metrics import (
 )
 from phase2.evaluation.src.single_task_model import SingleTaskToxicNet
 from phase2.deep_learning.src.loss import MaskedWeightedBCEWithLogitsLoss
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR, PREDICTIONS_DIR
 
 
 class TestMember4Evaluation(unittest.TestCase):
@@ -138,17 +139,16 @@ class TestMember4Evaluation(unittest.TestCase):
         self.assertEqual(y_obs.shape[1], 1)
 
     def test_10_directory_structure_completeness(self):
-        """Test 10: Verify all designated Member 4 folders exist."""
-        subdirs = [
-            "configs", "src", "predictions/dropout", "predictions/class_weight",
-            "predictions/multitask_single_task", "checkpoints/dropout",
-            "checkpoints/class_weight", "checkpoints/single_task", "results",
-            "plots/dropout", "plots/class_weight", "plots/multitask_single_task",
-            "plots/model_comparison", "plots/error_analysis", "reports", "tests"
-        ]
-        for sub in subdirs:
-            p = self.base_dir / sub
-            self.assertTrue(p.exists(), f"Directory missing: {sub}")
+        """Test 10: Verify the evaluation folders exist.
+
+        Results, plots and predictions are no longer kept per module: they all
+        live in phase2/results/, which is why those three are checked there.
+        """
+        for sub in ["configs", "src", "tests"]:
+            self.assertTrue((self.base_dir / sub).exists(), f"Directory missing: {sub}")
+
+        for shared in [METRICS_DIR, PLOTS_DIR, PREDICTIONS_DIR]:
+            self.assertTrue(shared.exists(), f"Directory missing: {shared}")
 
 
 if __name__ == "__main__":

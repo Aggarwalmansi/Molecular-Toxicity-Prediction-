@@ -31,12 +31,13 @@ from phase2.hybrid.src.hybrid_model import (
     save_forests,
     train_all_endpoints,
 )
+from phase2.data.src.data_loader import METRICS_DIR, PREDICTIONS_DIR
 
 
 def main():
     config = load_config()
     loader = Tox21DataLoader()
-    reports_dir = get_module_dir() / "reports"
+    reports_dir = METRICS_DIR
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
@@ -97,7 +98,7 @@ def main():
               f"({hybrid_score - embeddings_only_score:+.4f}), but we keep them because the "
               f"task specifies the hybrid feature set")
 
-    hybrid_val_results.to_csv(reports_dir / "validation_evaluation.csv", index=False)
+    hybrid_val_results.to_csv(reports_dir / "hybrid_validation_evaluation.csv", index=False)
 
     print()
     print("=" * 70)
@@ -113,7 +114,7 @@ def main():
     print("=" * 70)
     test_probabilities = predict_probabilities(forests, test_features)
     hybrid_results = evaluate_predictions(test_probabilities, test_labels, test_mask)
-    hybrid_results.to_csv(reports_dir / "test_evaluation.csv", index=False)
+    hybrid_results.to_csv(reports_dir / "hybrid_test_evaluation.csv", index=False)
     print(hybrid_results.to_string(index=False))
 
     save_predictions(
@@ -121,7 +122,7 @@ def main():
         test_labels,
         test_mask,
         test_ids,
-        reports_dir / "test_predictions.csv",
+        PREDICTIONS_DIR / "hybrid_test_predictions.csv",
     )
 
     print()
@@ -131,13 +132,13 @@ def main():
     for metric in ["ROC-AUC", "PR-AUC", "F1-Score", "MCC"]:
         comparison = build_comparison(hybrid_results, metric=metric)
         safe_metric = metric.replace("-", "_").lower()
-        comparison.to_csv(reports_dir / f"comparison_{safe_metric}.csv")
+        comparison.to_csv(reports_dir / f"hybrid_comparison_{safe_metric}.csv")
         print()
         print(f"--- {metric} ---")
         print(comparison.to_string())
 
     print()
-    print("Finished. Reports written to phase2/hybrid/reports/")
+    print("Finished. Results written to phase2/results/")
 
 
 if __name__ == "__main__":

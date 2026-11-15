@@ -34,9 +34,9 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from phase2.data.src.data_loader import Tox21DataLoader
 from phase2.deep_learning.src.model import MultiTaskToxicNet
 from phase2.hybrid.src.hybrid_model import TARGET_ASSAYS
+from phase2.data.src.data_loader import METRICS_DIR, PREDICTIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RESULTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "results"
 SPLITS = ["train", "val", "test"]
 
 
@@ -177,7 +177,7 @@ def build_long_table(probabilities, loader, model_name):
 
 
 def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
     loader = Tox21DataLoader()
     train_labels, train_mask, _ = loader.load_labels(split="train")
 
@@ -266,16 +266,15 @@ def main():
         print(f"  {name:32s} ({scores['n_features']:4d} feat)  "
               f"val ROC {scores['val_roc_auc']:.4f}  test ROC {scores['test_roc_auc']:.4f}")
 
-    predictions_dir = PROJECT_ROOT / "phase2" / "experiments" / "predictions"
-    predictions_dir.mkdir(parents=True, exist_ok=True)
+    PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
     pd.concat(prediction_tables, ignore_index=True).to_parquet(
-        predictions_dir / "feature_hybrid_predictions.parquet", index=False
+        PREDICTIONS_DIR / "feature_hybrid_predictions.parquet", index=False
     )
 
     results = pd.DataFrame(rows)[
         ["variant", "n_features", "val_roc_auc", "val_pr_auc", "test_roc_auc", "test_pr_auc"]
     ].sort_values("val_roc_auc", ascending=False)
-    results.to_csv(RESULTS_DIR / "hybrid_variants.csv", index=False)
+    results.to_csv(METRICS_DIR / "hybrid_variants.csv", index=False)
 
     print()
     print(results.to_string(index=False))

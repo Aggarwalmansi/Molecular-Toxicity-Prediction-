@@ -30,6 +30,7 @@ from torch.utils.data import DataLoader
 
 from .loss import MaskedWeightedBCEWithLogitsLoss
 from .model import MultiTaskToxicNet
+from phase2.data.src.data_loader import METRICS_DIR, PLOTS_DIR
 
 
 class MultiTaskTrainer:
@@ -75,8 +76,8 @@ class MultiTaskTrainer:
         # Checkpoints & Reports directories
         base_dir = Path(__file__).resolve().parent.parent
         self.checkpoint_dir = Path(checkpoint_dir or (base_dir / "checkpoints"))
-        self.report_dir = Path(report_dir or (base_dir / "reports"))
-        self.plot_dir = self.report_dir / "plots"
+        self.report_dir = Path(report_dir or METRICS_DIR)
+        self.plot_dir = PLOTS_DIR
 
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.report_dir.mkdir(parents=True, exist_ok=True)
