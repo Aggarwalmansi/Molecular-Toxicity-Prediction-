@@ -1,0 +1,5 @@
+Feature set,Features,Val macro ROC-AUC,Val macro PR-AUC
+embeddings only (128),128,0.7699,0.402
+embeddings + descriptors (133),133,0.7733,0.4042
+raw only (2053),2053,0.8044,0.4736
+FUSED raw + embeddings (2181),2181,0.78,0.4185

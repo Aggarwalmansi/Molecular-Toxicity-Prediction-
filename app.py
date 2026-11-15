@@ -79,7 +79,7 @@ if page == 'Overview':
             st.bar_chart(summary.rename(columns={'roc_auc':'ROC-AUC','average_precision':'Average precision'}), color=['#153d50','#00a69c'])
     with right:
         st.subheader('What we learned')
-        st.write('**Random Forest remains the strongest model** in the verified inference bundle. Shared neural learning is promising, but the tested hybrid does not exceed the standalone models.')
+        st.write('**Random Forest remains the strongest single model** in the verified inference bundle, where the hybrid concatenates neural features with descriptors and does not exceed it. Member 3 has since shown that combining the two models at the *probability* level does beat the Phase 1 baseline (test ROC-AUC 0.7685 vs 0.7541); that ensemble is reported in Experiments & results and is not part of this live bundle.')
         st.write('**Reproducibility matters.** Integration checks uncovered a checkpoint/embedding mismatch. The demo uses a separately rebuilt, consistent model bundle.')
         st.caption('Scores shown here describe the live demo models. Historical and three-seed experiments are labelled separately in Experiments & results.')
     st.info('Use “Predict a molecule” to compare RF, neural-network and hybrid scores for a new SMILES string.')
@@ -125,7 +125,7 @@ elif page == 'Model architectures':
         st.subheader('Neural representation + endpoint-specific forests')
         st.graphviz_chart('digraph {rankdir=LR; node [shape=box,style="rounded,filled",fillcolor="#edf5f5",fontname="Arial"]; "Frozen neural encoder" -> "128 learned features" -> "133 features"; "5 scaled descriptors" -> "133 features"; "133 features" -> "12 Random Forests" -> "Assay scores";}')
         st.write('The hypothesis is that shared neural features can help a forest generalize across scaffolds. Forests use 100 trees, depth 12 and balanced class weights. Only observed training labels are used.')
-        st.info('The tested hybrid does not outperform the standalone RF or DL model. Its value is an implemented and evaluated hypothesis, not an assumed accuracy improvement.')
+        st.info('This feature-concatenation hybrid does not outperform the standalone RF or DL model: Random Forests pick splits by impurity gain, so dense neural features crowd out the sparse Morgan bits. Blending the two models\' probabilities instead (alpha=0.80) does beat the Phase 1 baseline — see Experiments & results.')
 
 elif page == 'Experiments & results':
     current,historical,ablations = st.tabs(['Verified demo bundle','Historical benchmark','Ablation studies'])

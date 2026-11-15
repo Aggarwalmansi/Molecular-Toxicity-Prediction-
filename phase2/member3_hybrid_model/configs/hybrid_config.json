@@ -1,29 +1,64 @@
 {
   "model_name": "HybridDLFeatureRandomForest",
-  "version": "1.0.0",
-  "description": "Random Forest trained on Member 2's learned DL embeddings combined with the 5 RDKit molecular descriptors.",
+  "version": "2.1.0",
+  "description": "Random Forest trained on the FUSED feature set: Member 1's 2,048 Morgan bits + 5 scaled RDKit descriptors concatenated with Member 2's 128 learned DL embeddings. Also supports probability blending with Member 2's DL model.",
   "feature_blocks": {
+    "raw_features": {
+      "source": "tox21_member2_handoff/artifacts/X_combined.parquet",
+      "contents": "2,048 binary Morgan bits + 5 scaled RDKit descriptors",
+      "names": [
+        "MolWt",
+        "TPSA",
+        "MolLogP",
+        "NumHDonors",
+        "NumHAcceptors"
+      ],
+      "dimensions": 2053,
+      "note": "Descriptors standardised in Phase 1 using training statistics only."
+    },
     "dl_embeddings": {
       "source": "phase2/member2_deep_learning_model/embeddings/<split>_embeddings.parquet",
       "extracted_from": "MultiTaskToxicNet.latent_layer (128-dim bottleneck)",
       "dimensions": 128
-    },
-    "molecular_descriptors": {
-      "source": "tox21_member2_handoff/artifacts/X_descriptors_scaled.parquet",
-      "names": ["MolWt", "TPSA", "MolLogP", "NumHDonors", "NumHAcceptors"],
-      "dimensions": 5,
-      "note": "Standardised in Phase 1 using training statistics only."
     }
   },
-  "total_features": 133,
+  "total_features": 2181,
   "random_forest": {
-    "n_estimators": 100,
-    "max_depth": 12,
+    "n_estimators": 200,
+    "max_depth": 15,
+    "min_samples_leaf": 2,
     "class_weight": "balanced",
     "random_state": 42,
     "n_jobs": -1,
-    "note": "Identical to the Phase 1 Random Forest in train_models.py, so the only difference in the comparison is the input features."
+    "note": "Deeper and wider than the Phase 1 forest to exploit the 2,181 fused features."
   },
   "decision_threshold": 0.5,
-  "num_endpoints": 12
+  "num_endpoints": 12,
+  "ensemble": {
+    "method": "probability_blending",
+    "formula": "P_final = alpha * P_rf + (1 - alpha) * P_dl",
+    "alpha_default": 0.6,
+    "alpha_grid": [
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9
+    ],
+    "tuned_on": "validation split (782 molecules), macro ROC-AUC",
+    "dl_source": "phase2/member2_deep_learning_model/checkpoints/best_multitask_model.pt",
+    "alpha_grid_note": "The requested [0.5 .. 0.7] grid was extended because validation macro ROC-AUC was still rising at alpha=0.70."
+  },
+  "feature_arm_selection": {
+    "mode": "validation_macro_roc_auc",
+    "candidates": [
+      "fused_2181",
+      "raw_2053"
+    ],
+    "finding": "Concatenating the 128 dense embeddings onto the 2,053 raw features LOWERS validation macro ROC-AUC from 0.8044 to 0.7800. Random Forests pick splits by impurity gain over sqrt(n_features) sampled columns, and a continuous embedding offers thousands of candidate thresholds where a binary Morgan bit offers one, so the 128 embeddings win far more splits than their 6% share of columns warrants and crowd out the fingerprint evidence. max_features retuning does not rescue it (see reports/fusion_study_features.csv). The learned representation is therefore combined at the PROBABILITY level instead of the input level."
+  }
 }

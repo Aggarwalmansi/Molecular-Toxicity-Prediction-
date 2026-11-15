@@ -1,0 +1,6 @@
+Model,Test macro ROC-AUC,Test macro PR-AUC,ROC-AUC vs Phase 1
+Phase 1 Random Forest (baseline),0.7541,0.3962,0.0
+Phase 2 DL MultiTaskToxicNet,0.7266,0.3298,
+"Phase 2 fused RF (2,181 features)",0.7156,0.3284,-0.0385
+"Phase 2 raw RF (2,053 features, upgraded)",0.7674,0.4063,0.0133
+"Phase 2 blended ensemble (raw 2053 + DL, alpha=0.80)",0.7685,0.3983,0.0144

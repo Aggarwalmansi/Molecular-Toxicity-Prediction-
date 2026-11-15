@@ -16,7 +16,7 @@ def main():
     export_baseline()
     labels = pd.read_parquet(ARTIFACTS / 'labels_and_splits.parquet')
     features = pd.read_parquet(ARTIFACTS / 'X_combined.parquet').set_index('mol_id').loc[labels.mol_id].to_numpy(dtype=np.float32)
-    model = load_neural_model()
+    model = load_neural_model(verify=False)
     with torch.inference_mode():
         chunks = [model.forward_with_embeddings(torch.from_numpy(x)) for x in np.array_split(features, 32)]
     probabilities = torch.sigmoid(torch.cat([x[0] for x in chunks])).numpy()

@@ -50,20 +50,63 @@ def load_config():
 
 def make_random_forest(config):
     """
-    Builds a Random Forest with the same settings as the Phase 1 baseline.
+    Builds the Random Forest used for every endpoint.
 
-    Keeping the forest identical to Phase 1 matters: when we later compare the
-    standalone Random Forest against the hybrid, the only thing that changed
-    is the input features, not the learning algorithm.
+    The settings are scaled up from the Phase 1 baseline (100 trees, depth 12)
+    because the forest now sees 2,181 fused features instead of 2,053 or 133:
+    more trees to average over a wider feature space, more depth to combine
+    sparse Morgan bits with the dense DL embeddings, and min_samples_leaf=2 to
+    stop single-molecule leaves memorising the rare active class.
     """
     settings = config["random_forest"]
     return RandomForestClassifier(
-        n_estimators=settings["n_estimators"],
-        max_depth=settings["max_depth"],
-        class_weight=settings["class_weight"],
-        random_state=settings["random_state"],
-        n_jobs=settings["n_jobs"],
+        n_estimators=settings.get("n_estimators", 200),
+        max_depth=settings.get("max_depth", 15),
+        min_samples_leaf=settings.get("min_samples_leaf", 2),
+        class_weight=settings.get("class_weight", "balanced"),
+        random_state=settings.get("random_state", 42),
+        n_jobs=settings.get("n_jobs", -1),
     )
+
+
+def blend_predictions(rf_probs, dl_probs, alpha=0.6):
+    """
+    Blends Random Forest and deep learning probabilities into one prediction:
+
+        P_final = alpha * P_rf + (1 - alpha) * P_dl
+
+    The two models make different kinds of mistakes — the forest splits on
+    individual Morgan bits, the network learns smooth combinations of them — so
+    averaging their probabilities cancels part of the uncorrelated error. alpha
+    weights how much we trust the forest; it is tuned on the validation split,
+    never on test.
+
+    Parameters
+    ----------
+    rf_probs : array of shape (n_molecules, 12)
+        Random Forest probabilities of the active class.
+    dl_probs : array of shape (n_molecules, 12)
+        MultiTaskToxicNet sigmoid probabilities, same row and column order.
+    alpha : float, default 0.6
+        Weight on the Random Forest, in [0, 1].
+
+    Returns
+    -------
+    array of shape (n_molecules, 12) with the blended probabilities.
+    """
+    rf_probs = np.asarray(rf_probs, dtype=np.float64)
+    dl_probs = np.asarray(dl_probs, dtype=np.float64)
+
+    if rf_probs.shape != dl_probs.shape:
+        raise ValueError(
+            f"Shape mismatch between RF {rf_probs.shape} and DL {dl_probs.shape} "
+            "probability matrices; the two models must score the same molecules "
+            "and endpoints in the same order."
+        )
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"alpha must be in [0, 1], got {alpha}.")
+
+    return alpha * rf_probs + (1.0 - alpha) * dl_probs
 
 
 def select_observed_rows(features, labels, mask, endpoint_index):

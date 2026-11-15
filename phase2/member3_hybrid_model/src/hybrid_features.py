@@ -3,19 +3,31 @@ hybrid_features.py
 ==================
 Builds the hybrid feature set for Member 3.
 
-The hybrid input is two blocks joined side by side:
+Phase 2 fix — feature FUSION instead of feature REPLACEMENT
+-----------------------------------------------------------
+The first version of this module handed the Random Forest only the 128
+continuous bottleneck embeddings plus the 5 descriptors (133 features). That
+threw away the 2,048 raw Morgan bits the Phase 1 forest was actually good at,
+and test macro ROC-AUC collapsed from 0.7541 to 0.6785.
 
-    [ 128 learned DL features ] + [ 5 molecular descriptors ] = 133 features
+The hybrid input is now the two blocks joined side by side:
+
+    [ 2,048 Morgan bits + 5 scaled descriptors ] + [ 128 learned DL features ]
+    = 2,181 features
+
+So the forest keeps every signal Phase 1 had and *gains* the DL representation
+on top, which is what "hybrid" was supposed to mean.
 
 The 128 learned features are the bottleneck embeddings already extracted by
 Member 2 from the trained MultiTaskToxicNet. We read them from the saved
 parquet files instead of re-running the network, so Member 2's model is used
 exactly as they trained it.
 
-The 5 descriptors (MolWt, TPSA, MolLogP, NumHDonors, NumHAcceptors) are loaded
-through Member 1's Tox21DataLoader, which reads the Phase 1 scaled descriptor
-file. Those values were standardised in Phase 1 using training statistics
-only, so reusing them introduces no leakage.
+The raw 2,053-dim block ('combined') is loaded through Member 1's
+Tox21DataLoader: 2,048 binary Morgan bits plus the 5 descriptors
+(MolWt, TPSA, MolLogP, NumHDonors, NumHAcceptors). Those descriptors were
+standardised in Phase 1 using training statistics only, so reusing them
+introduces no leakage.
 """
 
 from pathlib import Path
@@ -24,6 +36,12 @@ import numpy as np
 import pandas as pd
 
 DESCRIPTOR_NAMES = ["MolWt", "TPSA", "MolLogP", "NumHDonors", "NumHAcceptors"]
+
+N_MORGAN_BITS = 2048
+N_DESCRIPTORS = 5
+N_EMBEDDINGS = 128
+N_RAW_FEATURES = N_MORGAN_BITS + N_DESCRIPTORS      # 2053
+N_FUSED_FEATURES = N_RAW_FEATURES + N_EMBEDDINGS    # 2181
 
 
 def get_embeddings_dir():
@@ -53,42 +71,102 @@ def load_dl_embeddings(split):
     return embeddings, mol_ids
 
 
-def build_hybrid_features(loader, split, use_descriptors=True):
+def load_raw_features(loader, split):
+    """
+    Loads Member 1's canonical 2,053-dim block for one split:
+    2,048 Morgan bits followed by the 5 scaled descriptors.
+
+    Returns:
+        features: array of shape (n_molecules, 2053)
+        mol_ids:  list of molecule ids in the same row order
+    """
+    features, mol_ids = loader.load_features("combined", split=split)
+    features = np.asarray(features, dtype=np.float64)
+    if features.shape[1] != N_RAW_FEATURES:
+        raise ValueError(
+            f"Expected {N_RAW_FEATURES} raw features on split '{split}', "
+            f"got {features.shape[1]}."
+        )
+    return features, list(mol_ids)
+
+
+def build_hybrid_features(loader, split, use_raw_features=True, use_descriptors=True,
+                          use_embeddings=True):
     """
     Builds the hybrid feature matrix for one split.
 
-    The molecule order from Member 2's embeddings is checked against the order
-    from Member 1's loader. If they ever stop matching we stop immediately,
-    because silently mismatched rows would pair one molecule's features with
-    another molecule's labels.
+    Molecule IDs from Member 2's embeddings are checked row-for-row against the
+    IDs from Member 1's loader before anything is concatenated. If they ever
+    stop matching we stop immediately, because silently mismatched rows would
+    pair one molecule's features with another molecule's labels.
 
-    use_descriptors=False returns the 128 embeddings on their own. We use that
-    on the validation split to check whether the 5 descriptors actually add
-    anything.
+    Parameters
+    ----------
+    use_raw_features : bool, default True
+        Include the 2,048 Morgan bits + 5 descriptors block (2,053 features).
+    use_descriptors : bool, default True
+        Only consulted when use_raw_features is False. Appends the 5 scaled
+        descriptors to the embeddings, reproducing the old 133-feature
+        ablation arm so the fused model can be compared against it.
+    use_embeddings : bool, default True
+        Include Member 2's 128 latent embeddings.
 
-    Returns:
-        features: array of shape (n_molecules, 133) or (n_molecules, 128)
-        mol_ids:  list of molecule ids
+    Returns
+    -------
+    features : array of shape (n_molecules, D)
+        D = 2181 for the default fused configuration.
+    mol_ids : list of molecule ids, aligned with the feature rows.
     """
-    embeddings, embedding_mol_ids = load_dl_embeddings(split)
-    descriptors, descriptor_mol_ids = loader.load_features("descriptors_scaled", split=split)
+    if not use_raw_features and not use_embeddings:
+        raise ValueError("At least one of use_raw_features / use_embeddings must be True.")
 
-    if embedding_mol_ids != list(descriptor_mol_ids):
+    blocks = []
+    reference_ids = None
+
+    if use_raw_features:
+        raw_features, raw_mol_ids = load_raw_features(loader, split)
+        reference_ids = raw_mol_ids
+        blocks.append(raw_features)
+
+    if use_embeddings:
+        embeddings, embedding_mol_ids = load_dl_embeddings(split)
+        if reference_ids is None:
+            reference_ids = embedding_mol_ids
+        elif embedding_mol_ids != reference_ids:
+            raise ValueError(
+                f"Molecule order mismatch on split '{split}' between Member 2's "
+                "embeddings and Member 1's feature table."
+            )
+        blocks.append(embeddings)
+
+    if not use_raw_features and use_descriptors:
+        descriptors, descriptor_mol_ids = loader.load_features("descriptors_scaled", split=split)
+        if list(descriptor_mol_ids) != reference_ids:
+            raise ValueError(
+                f"Molecule order mismatch on split '{split}' between Member 1's "
+                "descriptor table and the embedding rows."
+            )
+        blocks.append(np.asarray(descriptors, dtype=np.float64))
+
+    features = blocks[0] if len(blocks) == 1 else np.concatenate(blocks, axis=1)
+
+    if features.shape[0] != len(reference_ids):
         raise ValueError(
-            f"Molecule order mismatch on split '{split}' between Member 2's "
-            "embeddings and Member 1's descriptor table."
+            f"Row count mismatch on split '{split}': {features.shape[0]} feature rows "
+            f"for {len(reference_ids)} molecule ids."
         )
 
-    if not use_descriptors:
-        return embeddings, embedding_mol_ids
-
-    features = np.concatenate([embeddings, descriptors.astype(np.float64)], axis=1)
-    return features, embedding_mol_ids
+    return features, reference_ids
 
 
-def get_feature_names(use_descriptors=True):
+def get_feature_names(use_raw_features=True, use_descriptors=True, use_embeddings=True):
     """Returns the column names of the hybrid feature matrix, for feature importance plots."""
-    names = [f"emb_{i:03d}" for i in range(128)]
-    if use_descriptors:
-        names = names + DESCRIPTOR_NAMES
+    names = []
+    if use_raw_features:
+        names += [f"morgan_{i:04d}" for i in range(N_MORGAN_BITS)]
+        names += DESCRIPTOR_NAMES
+    if use_embeddings:
+        names += [f"emb_{i:03d}" for i in range(N_EMBEDDINGS)]
+    if not use_raw_features and use_descriptors:
+        names += DESCRIPTOR_NAMES
     return names

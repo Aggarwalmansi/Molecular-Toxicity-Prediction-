@@ -1,5 +1,5 @@
 {
-  "checkpoint_sha256": "4c78a2fd8ffecf227d5f9a9983e8f6734b007582977d59ed167112846e7623c9",
+  "checkpoint_sha256": "3a603f80d126d7067a0c2b927cf07b857bcae4ea868841ecbd02f9d7b591aada",
   "sklearn_version": "1.8.0",
   "torch_version": "2.11.0",
   "training_split": "train",

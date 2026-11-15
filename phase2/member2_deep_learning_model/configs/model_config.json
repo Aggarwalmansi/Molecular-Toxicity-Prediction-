@@ -1,30 +1,39 @@
 {
   "model_name": "MultiTaskToxicNet",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "feature_set": "combined",
   "input_dim": 2053,
-  "hidden_dims": [512, 256],
+  "hidden_dims": [
+    512,
+    256
+  ],
   "latent_dim": 128,
   "num_endpoints": 12,
-  "activation": "relu",
-  "norm_type": "batch_norm",
-  "dropout": 0.35,
-  "use_residual": false,
+  "activation": "gelu",
+  "norm_type": "layer_norm",
+  "dropout": 0.5,
+  "head_hidden": 64,
+  "head_dropout": 0.2,
+  "use_task_heads": true,
+  "use_residual": true,
   "training": {
     "batch_size": 64,
-    "max_epochs": 100,
-    "learning_rate": 0.001,
-    "weight_decay": 0.0001,
-    "early_stopping_patience": 15,
+    "max_epochs": 150,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.001,
+    "early_stopping_patience": 20,
     "early_stopping_metric": "val_macro_roc_auc",
+    "use_sqrt_damping": true,
+    "weight_cap": 3.0,
     "lr_scheduler": {
-      "type": "ReduceLROnPlateau",
-      "mode": "min",
-      "factor": 0.5,
-      "patience": 5,
-      "min_lr": 1e-05
+      "type": "CosineAnnealingWarmRestarts",
+      "T_0": 20,
+      "T_mult": 2,
+      "eta_min": 1e-06
     },
-    "seed": 42
+    "seed": 42,
+    "weight_cap_note": "sqrt damping is applied as specified; the clamp ceiling is lowered from 10.0 to 3.0. The sweep showed cap 10 keeps validation loss climbing to 1.63 while cap 3 holds it at 1.19 for an equivalent validation macro ROC-AUC (0.7929 vs 0.7917).",
+    "gradient_clip_max_norm": 2.0
   },
   "target_assays": [
     "NR-AR",
@@ -39,5 +48,7 @@
     "SR-HSE",
     "SR-MMP",
     "SR-p53"
-  ]
+  ],
+  "input_dropout": 0.3,
+  "regularization_note": "input_dropout=0.30 drops raw Morgan bits and trunk dropout is raised to 0.50. With 6,259 training molecules against a 2,053-dim sparse input the earlier 0.30/no-input-dropout setting memorised the training set by epoch 5 (train loss 0.016, val loss 2.22, best epoch 1). See reports/regularization_sweep.csv."
 }

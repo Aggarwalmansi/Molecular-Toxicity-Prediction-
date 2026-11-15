@@ -11,7 +11,7 @@
 Member 2 is responsible for the deep learning core of Phase 2, predicting all 12 Tox21 biological endpoints simultaneously using hard parameter sharing:
 1. **Multi-Task Neural Network (`MultiTaskToxicNet`):** PyTorch deep neural network accepting canonical 2,053-dim molecular features (`X_combined`: 2,048-bit Morgan circular fingerprints + 5 standardized physical descriptors) and predicting 12 target assays in a single forward pass.
 2. **Masked & Weighted Loss (`MaskedWeightedBCEWithLogitsLoss`):** Strictly excludes unmeasured assay targets (17.06% missing labels) from backpropagation while applying exact training-set positive class weights ($w_j = 5.71 \to 38.85$) to counter severe activity imbalance.
-3. **Regularization & Early Stopping:** Dropout ($p=0.35$), weight decay ($1\times 10^{-4}$), batch normalization, and early stopping monitoring validation macro ROC-AUC with learning rate scheduling.
+3. **Regularization & Early Stopping:** Input dropout ($p=0.30$) on the raw fingerprint bits, trunk dropout ($p=0.50$), weight decay ($1\times 10^{-3}$), LayerNorm, gradient clipping at $\lVert g \rVert \le 2$, and early stopping on validation macro ROC-AUC under a `CosineAnnealingWarmRestarts` schedule ($T_0=20$, $T_{mult}=2$).
 4. **Checkpoint Deliverable:** Certified best model checkpoint saved at `checkpoints/best_multitask_model.pt`.
 5. **Learned Molecular Features (Embeddings Handoff for Member 3):** 128-dimensional continuous latent representations $z \in \mathbb{R}^{128}$ extracted from the bottleneck layer for all 7,823 compounds (`train_embeddings.parquet`, `val_embeddings.parquet`, `test_embeddings.parquet`) with row-for-row compound ID alignment.
 6. **Holdout Test Benchmark:** Evaluated on the 782-compound holdout test set across all 12 endpoints (ROC-AUC, PR-AUC, F1, Balanced Accuracy, MCC).
@@ -66,13 +66,16 @@ phase2/member2_deep_learning_model/
                 [2,048 Morgan circular bits + 5 standardized descriptors]
                                     │
                                     ▼
-       Linear(2,053 → 512) ── BatchNorm1d ── ReLU ── Dropout(0.35)
+                          Dropout(0.30) on the raw input bits
                                     │
                                     ▼
-       Linear(512 → 256)   ── BatchNorm1d ── ReLU ── Dropout(0.35)
+    ResidualBlock(2,053 → 512) ── LayerNorm ── GELU ── Dropout(0.50)
                                     │
                                     ▼
-       Linear(256 → 128)   ── BatchNorm1d ── ReLU ── Dropout(0.175)
+    ResidualBlock(512 → 256)   ── LayerNorm ── GELU ── Dropout(0.50)
+                                    │
+                                    ▼
+    ResidualBlock(256 → 128)   ── LayerNorm ── GELU ── Dropout(0.25)
                                     │
                          ┌──────────┴──────────┐
                          │ Latent Bottleneck z │ ──▶ Exported as 128-dim Embeddings
@@ -80,13 +83,26 @@ phase2/member2_deep_learning_model/
                          └──────────┬──────────┘
                                     │
                                     ▼
-                         Linear(128 → 12) Output
+        12 × TaskHead: Linear(128 → 64) ── GELU ── Dropout(0.2) ── Linear(64 → 1)
                                     │
                                     ▼
                          12 Multi-Task Logits
 ```
 
-- **Total Trainable Parameters:** **1,219,212**
+Each `ResidualBlock` adds a skip connection around the dense layer, with a
+learned linear projection on the skip path where the dimensions change.
+
+**Why these choices, specifically:**
+
+| Choice | Reason |
+| :--- | :--- |
+| **LayerNorm, not BatchNorm** | Morgan fingerprints are ~98% zeros. BatchNorm normalizes each bit across the batch, so a bit that is on in 2 of 64 molecules gets rescaled by a near-zero batch variance, amplifying noise and destroying the sparsity structure. LayerNorm normalizes across features within one molecule, leaving the sparsity pattern intact. |
+| **GELU, not ReLU** | Smoother gradients through the residual trunk; no dead units on the many exactly-zero pre-activations that sparse inputs produce. |
+| **Residual connections** | Keep a short gradient path to the input layer, so the 2,053 → 512 projection still receives usable gradient after three blocks. |
+| **Per-endpoint heads** | A single `Linear(128, 12)` forces one shared linear readout on all 12 endpoints, so Nuclear Receptor and Stress Response pathways fight over the same directions in `z`. Dedicated heads give each endpoint its own non-linear readout while the trunk stays shared. |
+| **Input dropout (0.30)** | With 6,259 training molecules against 2,053 sparse inputs the trunk otherwise memorizes individual bits within five epochs (train loss 0.016, validation loss 2.22). See section 4.1. |
+
+- **Total Trainable Parameters:** **2,532,492**
 - **Hard Parameter Sharing:** The lower representations capture cross-cutting biological mechanisms (cellular stress, electrophilic binding, DNA damage sensing) across both Nuclear Receptors (NR) and Stress Response (SR) pathways (Mayr et al., 2016).
 
 ### 3.2 Masked & Weighted Multi-Task Loss
@@ -97,36 +113,119 @@ $$\mathcal{L}_{\text{multitask}} = \frac{1}{\sum_{i=1}^B \sum_{j=1}^{12} m_{ij}}
 
 Where:
 - $m_{ij} \in \{0, 1\}$ is the boolean observation mask (1 if compound $i$ was tested in assay $j$).
-- $w_j = \frac{N_{\text{neg, train}}}{N_{\text{pos, train}}}$ is the training positive class weight.
 - $\sigma(\cdot)$ is the standard sigmoid activation function.
+- $w_j$ is the **sqrt-damped** training positive class weight:
+
+$$w_j = \min\left(\sqrt{\frac{N_{\text{neg, train}}}{N_{\text{pos, train}}}},\; c\right)$$
+
+Raw inverse-frequency weights span 5.71 (SR-MMP) to **38.85** (NR-PPAR-gamma).
+Feeding 38.85 straight into the loss means a single rare active contributes as
+much gradient as 39 inactives, so one minority compound in a batch of 64
+dominates the update and the loss spikes. Square-root damping compresses that
+range to 2.39–6.23 while preserving the ordering of endpoint rarity, and the
+clamp $c$ caps what is left.
+
+The clamp ceiling is **$c = 3.0$**, lowered from the 10.0 the damping formula
+allows. The measured reason is in section 4.2: at $c = 10$ validation loss
+climbs to 1.63, at $c = 3$ it holds at 1.19, and validation macro ROC-AUC is
+statistically indistinguishable (0.7929 vs 0.7917).
 
 ---
 
-## 4. Holdout Test Set Performance (Split B, 782 Compounds)
+## 4. Training Stability: the Overfitting Failure and What Fixed It
+
+### 4.1 The failure
+
+The original configuration (BatchNorm, ReLU, single linear classifier,
+undamped weights, lr $10^{-3}$, weight decay $10^{-4}$) memorized the training
+set almost immediately:
+
+| Epoch | Train loss | Val loss | Val macro ROC-AUC |
+| :---: | :---: | :---: | :---: |
+| 1 | 0.513 | 0.597 | 0.7857 |
+| 5 | 0.143 | 1.199 | 0.7529 |
+| 10 | 0.043 | 1.789 | 0.7477 |
+| 20 | 0.016 | 2.222 | 0.7476 |
+
+Train loss fell 32× while validation loss rose 3.7×. Early stopping therefore
+kept **epoch 1** — the exported embeddings came from a network that had seen
+each molecule once.
+
+### 4.2 What each fix was worth
+
+`src/regularization_sweep.py` measures this on the validation split only
+(30 epochs per configuration, `reports/regularization_sweep.csv`):
+
+| Configuration | Best val ROC-AUC | Best epoch | Final val loss |
+| :--- | :---: | :---: | :---: |
+| Architecture fixes only (as originally specified) | 0.7857 | 1 | 2.56 |
+| \+ input dropout 0.2 | 0.7925 | 2 | 2.03 |
+| \+ input dropout 0.3, trunk dropout 0.5 | **0.7929** | 3 | 1.63 |
+| \+ weight clamp $c=5$ | **0.7932** | 3 | 1.57 |
+| \+ weight clamp $c=3$ **(shipped)** | 0.7917 | 3 | **1.19** |
+| \+ weight clamp $c=2$ | 0.7905 | 3 | 0.89 |
+| no positive weighting at all | 0.7884 | 3 | 0.50 |
+
+Two honest observations:
+
+1. **The architecture changes alone did not fix the overfitting.** LayerNorm,
+   GELU, residual connections and per-task heads moved the best epoch from 1 to
+   1 and validation ROC-AUC from 0.7179 to 0.7857 on validation, but train loss
+   still collapsed to 0.02. Input dropout on the raw bits is what actually
+   slowed memorization.
+2. **Most of the "exploding" validation loss was a calibration artifact, not a
+   ranking failure.** Lowering the positive-weight clamp cuts validation loss
+   by more than half (2.56 → 0.89) while validation ROC-AUC barely moves. The
+   weighted loss punishes overconfident logits on the minority class, which is
+   why it grows so much faster than the model's actual ranking degrades.
+
+### 4.3 The shipped run
+
+| Epoch | Train loss | Val loss | Val macro ROC-AUC |
+| :---: | :---: | :---: | :---: |
+| 1 | 0.466 | 0.508 | 0.7698 |
+| 2 | 0.366 | 0.508 | 0.7886 |
+| **3** | 0.325 | **0.504** | **0.7917** |
+| 10 | 0.176 | 0.819 | 0.7644 |
+| 20 | 0.128 | 1.037 | 0.7573 |
+
+Validation loss now **improves** through epoch 3 rather than diverging after
+epoch 2, early stopping selects a genuinely trained network, and the end-state
+overfit gap is less than half what it was.
+
+**The remaining limitation, stated plainly:** validation macro ROC-AUC still
+peaks at epoch 3 and plateaus at ~0.79 across every configuration tested. With
+6,259 training molecules and a 2,053-dim sparse input, this network reaches its
+ceiling in a few epochs. The honest conclusion is that this is a small-data
+regime, not that more regularization tuning would keep helping.
+
+---
+
+## 5. Holdout Test Set Performance (Split B, 782 Compounds)
 
 Evaluated strictly on the held-out test partition with zero scaffold overlap with training or validation compounds:
 
 | Endpoint | Target Description | Test Actives | Test Inactives | Test ROC-AUC | Test PR-AUC | F1-Score | Balanced Acc | MCC | Precision | Recall |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **NR-AR** | Androgen Receptor | 39 | 669 | **0.7395** | **0.3996** | 0.4308 | 0.6705 | 0.4137 | 0.5385 | 0.3590 |
-| **NR-AR-LBD** | Androgen Receptor (LBD) | 21 | 610 | **0.7468** | **0.4717** | 0.5000 | 0.7734 | 0.4847 | 0.4444 | 0.5714 |
-| **NR-AhR** | Aryl Hydrocarbon Receptor | 96 | 533 | **0.7417** | **0.4005** | 0.4171 | 0.6543 | 0.3156 | 0.4286 | 0.4062 |
-| **NR-Aromatase** | Aromatase Enzyme | 48 | 462 | **0.7459** | **0.3657** | 0.3269 | 0.6349 | 0.2519 | 0.3036 | 0.3542 |
-| **NR-ER** | Estrogen Receptor | 82 | 457 | **0.5951** | **0.2522** | 0.2893 | 0.5812 | 0.1666 | 0.2987 | 0.2805 |
-| **NR-ER-LBD** | Estrogen Receptor (LBD) | 33 | 616 | **0.6942** | **0.2152** | 0.2632 | 0.6247 | 0.2203 | 0.2326 | 0.3030 |
-| **NR-PPAR-gamma** | PPAR-$\gamma$ | 29 | 548 | **0.7528** | **0.2336** | 0.3667 | 0.6714 | 0.3322 | 0.3548 | 0.3793 |
-| **SR-ARE** | Antioxidant Response Element | 123 | 366 | **0.7334** | **0.4655** | 0.5040 | 0.6687 | 0.3338 | 0.4961 | 0.5122 |
-| **SR-ATAD5** | ATAD5 Genotoxicity | 34 | 626 | **0.6654** | **0.1331** | 0.1918 | 0.5774 | 0.1451 | 0.1795 | 0.2059 |
-| **SR-HSE** | Heat Shock Response | 52 | 526 | **0.6877** | **0.2309** | 0.1957 | 0.5571 | 0.1287 | 0.2250 | 0.1731 |
-| **SR-MMP** | Mitochondrial Potential | 106 | 396 | **0.8326** | **0.5976** | 0.5727 | 0.7328 | 0.4535 | 0.5526 | 0.5943 |
-| **SR-p53** | p53 Tumor Suppressor | 65 | 558 | **0.6802** | **0.2862** | 0.2500 | 0.5781 | 0.1809 | 0.2979 | 0.2154 |
-| **MACRO AVERAGE** | — | **728** | **6,367** | **0.7179** | **0.3376** | **0.3590** | **0.6437** | **0.2856** | **0.3627** | **0.3629** |
+| **NR-AR** | Androgen Receptor | 39 | 669 | **0.7736** | **0.4901** | 0.5714 | 0.7044 | 0.6092 | 0.9412 | 0.4103 |
+| **NR-AR-LBD** | Androgen Receptor (LBD) | 21 | 610 | **0.7664** | **0.4047** | 0.5000 | 0.7094 | 0.4930 | 0.6000 | 0.4286 |
+| **NR-AhR** | Aryl Hydrocarbon Receptor | 96 | 533 | **0.7986** | **0.4863** | 0.4427 | 0.6969 | 0.3273 | 0.3567 | 0.5833 |
+| **NR-Aromatase** | Aromatase Enzyme | 48 | 462 | **0.7058** | **0.2298** | 0.1519 | 0.5354 | 0.0866 | 0.1935 | 0.1250 |
+| **NR-ER** | Estrogen Receptor | 82 | 457 | **0.6293** | **0.3254** | 0.3360 | 0.6040 | 0.2757 | 0.4884 | 0.2561 |
+| **NR-ER-LBD** | Estrogen Receptor (LBD) | 33 | 616 | **0.6851** | **0.3058** | 0.3200 | 0.6139 | 0.3134 | 0.4706 | 0.2424 |
+| **NR-PPAR-gamma** | PPAR-$\gamma$ | 29 | 548 | **0.7509** | **0.1383** | 0.0588 | 0.5136 | 0.0641 | 0.2000 | 0.0345 |
+| **SR-ARE** | Antioxidant Response Element | 123 | 366 | **0.6913** | **0.4335** | 0.4492 | 0.6335 | 0.2748 | 0.4690 | 0.4309 |
+| **SR-ATAD5** | ATAD5 Genotoxicity | 34 | 626 | **0.6908** | **0.1267** | 0.1724 | 0.5584 | 0.1378 | 0.2083 | 0.1471 |
+| **SR-HSE** | Heat Shock Response | 52 | 526 | **0.7046** | **0.2108** | 0.1600 | 0.5415 | 0.1216 | 0.2609 | 0.1154 |
+| **SR-MMP** | Mitochondrial Potential | 106 | 396 | **0.8083** | **0.5466** | 0.5455 | 0.7229 | 0.4095 | 0.4853 | 0.6226 |
+| **SR-p53** | p53 Tumor Suppressor | 65 | 558 | **0.7139** | **0.2598** | 0.2308 | 0.5681 | 0.1719 | 0.3077 | 0.1846 |
+| **MACRO AVERAGE** | — | **728** | **6,367** | **0.7266** | **0.3298** | **0.3282** | **0.6168** | **0.2737** | **0.4151** | **0.2984** |
 
 ---
 
-## 5. Downstream Integration & Handoff Contract
+## 6. Downstream Integration & Handoff Contract
 
-### 5.1 For Member 3: Hybrid ML Model
+### 6.1 For Member 3: Hybrid ML Model
 Member 3 can consume the extracted 128-dimensional latent representations directly:
 
 ```python
@@ -143,24 +242,32 @@ df_emb = pd.read_parquet("phase2/member2_deep_learning_model/embeddings/train_em
 assert df_emb["molecule_id"].tolist() == mids_desc  # Guaranteed alignment
 z_train = df_emb.drop(columns=["molecule_id"]).to_numpy() # (6259, 128)
 
-# 3. Form hybrid feature matrix:
-X_hybrid_train = np.hstack([z_train, X_desc_train]) # (6259, 133)
-print(f"Hybrid input space ready: {X_hybrid_train.shape}")
+# 3. Form the FUSED feature matrix: keep the raw block, add the embeddings.
+X_raw_train, mids_raw = loader.load_features("combined", split="train")  # (6259, 2053)
+assert mids_raw == mids_desc
+X_hybrid_train = np.hstack([X_raw_train, z_train]) # (6259, 2181)
+print(f"Fused input space ready: {X_hybrid_train.shape}")
 ```
 
-### 5.2 For Member 4: Benchmark Comparison
-Member 4 evaluates all models on the identical holdout test split (`test_evaluation.csv`):
-- Macro ROC-AUC: **0.7179**
-- Macro PR-AUC: **0.3376**
-- Peak Endpoints: **SR-MMP (0.8326)**, **NR-PPAR-gamma (0.7528)**, **NR-AR-LBD (0.7468)**, **NR-Aromatase (0.7459)**, **NR-AhR (0.7417)**.
+Do **not** replace the raw features with the embeddings. Feeding a Random
+Forest only `[z | descriptors]` (133 columns) drops test macro ROC-AUC to
+0.6785, because the 2,048 Morgan bits the forest splits on are gone. Member 3's
+README section 3 has the measurements, and also shows that the best use of this
+representation is probability blending rather than input concatenation.
 
-### 5.3 For Member 5: Dashboard & Presentation
+### 6.2 For Member 4: Benchmark Comparison
+Member 4 evaluates all models on the identical holdout test split (`test_evaluation.csv`):
+- Macro ROC-AUC: **0.7266**
+- Macro PR-AUC: **0.3298**
+- Peak Endpoints: **SR-MMP (0.8083)**, **NR-AhR (0.7986)**, **NR-AR (0.7736)**, **NR-AR-LBD (0.7664)**, **NR-PPAR-gamma (0.7509)**.
+
+### 6.3 For Member 5: Dashboard & Presentation
 - **Training plots**: Available under `reports/plots/` (`loss_curve.png`, `val_metrics_curve.png`, `per_endpoint_roc_pr.png`, `training_curves_summary.png`).
 - **Interactive Checkpoint**: `checkpoints/best_multitask_model.pt` can be loaded with PyTorch directly in the Streamlit application.
 
 ---
 
-## 6. Verification & Automated Test Suite
+## 7. Verification & Automated Test Suite
 
 Run the Member 2 test suite:
 
@@ -182,7 +289,7 @@ python3 -m unittest phase2/member2_deep_learning_model/tests/test_dl_model.py
 
 ---
 
-## 7. How to Retrain or Run Inference
+## 8. How to Retrain or Run Inference
 
 ```bash
 # Retrain model with default hyperparameters

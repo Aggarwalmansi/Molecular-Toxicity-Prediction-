@@ -67,8 +67,9 @@ def main():
     print("PHASE 2 — MEMBER 2: MULTI-TASK DEEP LEARNING MODEL TRAINING")
     print("=" * 70)
     print(f"Feature space: {config['feature_set']} ({config['input_dim']} dims)")
-    print(f"Architecture:  Input({config['input_dim']}) -> {config['hidden_dims']} -> Bottleneck({config['latent_dim']}) -> Outputs(12)")
-    print(f"Regularization: Dropout={config['dropout']}, Weight Decay={weight_decay}, Class Weighting=True")
+    print(f"Architecture:  Input({config['input_dim']}) -> {config['hidden_dims']} -> Bottleneck({config['latent_dim']}) -> 12 TaskHeads")
+    print(f"Improvements: LayerNorm, GELU, Residual Connections, Per-Task Heads, Sqrt-Damped Weights")
+    print(f"Regularization: InputDropout={config.get('input_dropout', 0.0)}, Dropout={config['dropout']}, HeadDropout={config.get('head_dropout', 0.2)}, Weight Decay={weight_decay}")
     print(f"Training Plan: Batch Size={batch_size}, Max Epochs={max_epochs}, Patience={patience}, LR={learning_rate}")
     print("=" * 70)
 
@@ -82,10 +83,11 @@ def main():
     )
     pos_weights = loader.get_class_weights(as_tensor=True)
     print(f"  └── DataLoaders created! Train batches: {len(train_loader)}, Val: {len(val_loader)}, Test: {len(test_loader)}")
-    print(f"  └── Positive class weights loaded (range: {pos_weights.min().item():.2f} - {pos_weights.max().item():.2f})")
+    print(f"  └── Raw positive class weights (range: {pos_weights.min().item():.2f} - {pos_weights.max().item():.2f})")
+    print(f"  └── Sqrt damping will be applied (cap={config['training'].get('weight_cap', 10.0)})")
 
     # 2. Instantiate Model
-    print("[2/5] Initializing MultiTaskToxicNet...")
+    print("[2/5] Initializing MultiTaskToxicNet (Improved Architecture)...")
     model = MultiTaskToxicNet(
         input_dim=config["input_dim"],
         hidden_dims=config["hidden_dims"],
@@ -94,8 +96,12 @@ def main():
         dropout=config["dropout"],
         norm_type=config["norm_type"],
         activation=config["activation"],
+        head_hidden=config.get("head_hidden", 64),
+        head_dropout=config.get("head_dropout", 0.2),
+        use_task_heads=config.get("use_task_heads", True),
+        input_dropout=config.get("input_dropout", 0.0),
     )
-    total_params = sum(p.num_parameters() if hasattr(p, "num_parameters") else p.numel() for p in model.parameters())
+    total_params = sum(p.numel() for p in model.parameters())
     print(f"  └── Total trainable parameters: {total_params:,}")
 
     # 3. Train Model
@@ -113,6 +119,9 @@ def main():
         report_dir=base_dir / "reports",
         target_assays=config["target_assays"],
         early_stopping_metric=early_metric,
+        use_sqrt_damping=config["training"].get("use_sqrt_damping", True),
+        weight_cap=config["training"].get("weight_cap", 10.0),
+        scheduler_config=config["training"].get("lr_scheduler"),
     )
     fit_summary = trainer.fit(max_epochs=max_epochs, patience=patience)
     print(f"  └── Training completed at epoch {fit_summary['best_epoch']}!")

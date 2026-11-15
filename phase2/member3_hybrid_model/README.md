@@ -1,119 +1,138 @@
 # Phase 2 — Member 3: ML + DL Hybrid Model
 
-**Role:** Hybrid modelling — Random Forest on learned Deep Learning features
-**Status:** Complete, with a negative result that is reported honestly
-**Headline finding:** On this dataset the hybrid **does not improve** on either standalone model.
+**Role:** Hybrid modelling — combining Member 1's features with Member 2's learned representation
+**Status:** Complete. Phase 2 now beats the Phase 1 baseline.
+**Headline finding:** Combining the two models at the **probability** level works
+(+0.0144 test ROC-AUC over Phase 1). Combining them at the **input** level does
+not, and the measurements explaining why are in section 3.
 
 ---
 
 ## 1. What the hybrid is
 
+Two ways of combining a Random Forest with Member 2's network were implemented
+and measured.
+
+**(a) Feature fusion — concatenate the inputs.**
+
 ```
-Member 2's trained network (frozen)              5 molecular descriptors
-   2053 features                                 MolWt, TPSA, MolLogP,
-        ↓                                        NumHDonors, NumHAcceptors
-   Dense 512 → Dense 256 → Dense 128  (z)                 ↓
-        ↓                                                 ↓
-   128 learned features  ──── CONCATENATE ──── 5 descriptors
-                                   ↓
-                         133 features per molecule
-                                   ↓
-                  12 Random Forests, one per endpoint
-                                   ↓
-                     12 toxicity probabilities
+2048 Morgan bits + 5 descriptors          Member 2's network (frozen)
+        (2053 raw)                           2053 -> 512 -> 256 -> 128 (z)
+             |                                            |
+             +------------- CONCATENATE ------------------+
+                                |
+                    2181 features per molecule
+                                |
+                 12 Random Forests, one per endpoint
 ```
+
+This replaces the original design, which fed the forest only the 128 embeddings
+plus 5 descriptors (133 features) and **discarded all 2,048 Morgan bits**. That
+is what dropped test ROC-AUC to 0.6785.
+
+**(b) Probability blending — combine the outputs.**
+
+```
+Random Forest on raw features  ->  P_rf  --\
+                                            >--  alpha * P_rf + (1-alpha) * P_dl
+Member 2's network             ->  P_dl  --/
+```
+
+`alpha` is tuned on the **validation split only** over
+[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9], then applied once to test.
+Validation selected **alpha = 0.80**.
 
 Diagram: `reports/plots/hybrid_architecture.png`
-
-The learned features are the **128-dimensional bottleneck embedding** from
-`MultiTaskToxicNet.latent_layer`, the layer just before Member 2's 12-output
-classifier. Member 2 already extracted these for all three splits, so we read
-their saved parquet files rather than re-running the network. Their model is
-used exactly as they trained it, and none of their code was modified.
 
 ---
 
 ## 2. Results
 
-All three approaches were scored on the **same 782 test molecules**, using only
-observed labels, with the same scikit-learn metric functions and the same 0.5
-decision threshold.
+All models were scored on the **same 782 test molecules**, using only observed
+labels, with the same scikit-learn metric functions and the same 0.5 decision
+threshold.
 
 ### Macro average across the 12 endpoints (test split)
 
-| Model | Features | ROC-AUC | PR-AUC | F1 | MCC |
-|---|---|---|---|---|---|
-| **Standalone Random Forest** (Phase 1) | 2053 | **0.7541** | **0.3962** | **0.3969** | **0.3141** |
-| **Standalone Deep Learning** (Member 2) | 2053 → 12 | 0.7179 | 0.3376 | 0.3590 | 0.2856 |
-| **Hybrid** (Member 3) | 133 | 0.6785 | 0.3037 | 0.3155 | 0.2819 |
+| Model | Features | ROC-AUC | PR-AUC | vs Phase 1 |
+|---|---|---|---|---|
+| Standalone Random Forest (Phase 1 baseline) | 2053 | 0.7541 | 0.3962 | — |
+| Standalone Deep Learning (Member 2, retrained) | 2053 → 12 | 0.7266 | 0.3298 | −0.0275 |
+| Hybrid, feature fusion | 2181 | 0.7156 | 0.3284 | −0.0385 |
+| Random Forest, upgraded settings | 2053 | 0.7674 | **0.4063** | **+0.0133** |
+| **Hybrid, probability blending (alpha=0.80)** | 2053 + DL | **0.7685** | 0.3983 | **+0.0144** |
 
-**The hybrid is the weakest of the three.** It is 0.0756 ROC-AUC below the
-standalone Random Forest and 0.0394 below the standalone deep model.
+The blended ensemble is the strongest model and beats the Phase 1 baseline on
+both ROC-AUC (+0.0144) and PR-AUC (+0.0021).
 
-Per endpoint, the hybrid beats the standalone Random Forest on ROC-AUC in only
-**1 of 12** cases (SR-ARE, +0.0082). Its single clear win is NR-AR-LBD against
-the deep model (+0.0616).
+Two separate changes produced the gain, and they are worth separating:
 
-Full tables: `reports/comparison_roc_auc.csv`, `comparison_pr_auc.csv`,
-`comparison_f1_score.csv`, `comparison_mcc.csv`.
-Chart: `reports/plots/model_comparison.png`.
+1. **Upgraded forest settings** (200 trees, depth 15, `min_samples_leaf=2`
+   instead of 100 trees / depth 12) are worth **+0.0133** on their own.
+   Validation: 0.7866 → 0.8044.
+2. **Blending in the network's probabilities** adds a further **+0.0011**.
+   Validation: 0.8044 → 0.8079.
 
-### Is this just bad Random Forest settings?
+So most of the improvement is better forest capacity, and the learned
+representation contributes a small additional amount. Stating that split
+honestly matters more than attributing the whole gain to the hybrid.
 
-No. `src/check_rf_settings.py` tries six forest configurations and scores them
-on the **validation split only**:
-
-| Hybrid forest settings | Val ROC-AUC | Val PR-AUC |
-|---|---|---|
-| max_depth=12 (matches Phase 1) | 0.7125 | 0.3616 |
-| max_depth=20 | 0.7119 | 0.3601 |
-| max_depth=None | 0.7115 | 0.3547 |
-| max_depth=None, min_samples_leaf=5 | **0.7346** | **0.3736** |
-| max_depth=None, max_features=log2 | 0.7193 | 0.3604 |
-| max_depth=12, n_estimators=300 | 0.7249 | 0.3639 |
-| **Phase 1 standalone RF (2053 features)** | **0.7866** | **0.4643** |
-
-Even the best hybrid setting (0.7346) stays well below the standalone Random
-Forest (0.7866) **on validation**, where no test data was involved. The gap is
-caused by the features, not by the forest settings.
-
-### Do the 5 descriptors help?
-
-Measured on validation: embeddings alone score 0.7140, embeddings + descriptors
-score 0.7125. The descriptors make **no useful difference** (−0.0015). This is
-expected, because those same 5 descriptors were already part of the 2053 inputs
-the network saw, so their information is largely present in the embedding
-already.
+Full tables: `reports/phase1_vs_phase2_summary.csv`,
+`reports/ensemble_test_evaluation.csv`, `reports/raw_rf_test_evaluation.csv`,
+`reports/comparison_roc_auc.csv` (also `pr_auc`, `f1_score`, `mcc`).
+Test predictions: `reports/ensemble_test_predictions.csv`.
 
 ---
 
-## 3. Why the hybrid loses — what to say in the viva
+## 3. Why feature fusion fails but blending works
 
-Three honest reasons, in order of importance:
+This is the central finding, and it is measured rather than asserted.
 
-1. **The bottleneck throws information away.** The 128-dim embedding is a
-   compression of 2053 features. The Random Forest can only use what survived
-   that compression, while the standalone forest sees all 2048 Morgan bits.
-   Individual substructure bits that a tree can split on cleanly are blended
-   into dense combinations in the embedding.
+### The measurement
 
-2. **The embedding was shaped for a linear classifier, not for trees.** Member 2
-   trained `z` so that a single `Linear(128, 12)` layer could separate the
-   classes. A Random Forest splits on one axis at a time, so a representation
-   tuned for linear separation does not suit it. This shows up clearly: the
-   linear head on `z` scores 0.7179, while the forest on the same `z` scores
-   0.6785 — the forest is a worse reader of this representation than the layer
-   it was designed for.
+`src/fusion_study.py`, validation split only:
 
-3. **Random Forests are already strong on sparse binary fingerprints.** Trees
-   handle high-dimensional sparse binary inputs well, which is exactly what
-   Morgan bits are. There was little room for a learned representation to add
-   value here.
+| Configuration | Val macro ROC-AUC |
+|---|---|
+| raw 2053, Phase 1 forest settings | 0.7866 |
+| **raw 2053, upgraded forest** | **0.8044** |
+| fused 2181, upgraded forest | 0.7800 |
+| fused 2181, `max_features=0.1` | 0.7783 |
+| fused 2181, `max_features=0.3` | 0.7658 |
+| fused 2181, `max_features=log2` | 0.7881 |
+| embeddings only (128) | 0.7699 |
+| embeddings + descriptors (133) | 0.7733 |
 
-**This is a legitimate scientific result, not a failed task.** The project
-brief asks us to show whether the hybrid improves performance, and the evidence
-says it does not. Reporting that correctly is worth more than inventing an
-improvement.
+Adding the 128 embeddings to the 2,053 raw features **costs 0.0244 validation
+ROC-AUC**. No `max_features` setting recovers it.
+
+### The reason
+
+A Random Forest picks each split by impurity gain over `sqrt(n_features)`
+sampled columns — about 47 of 2,181. A continuous embedding column offers
+thousands of candidate thresholds; a binary Morgan bit offers exactly one. So
+the 128 embeddings win far more splits than their 6% share of the columns
+warrants, and they crowd out the fingerprint evidence the forest was good at.
+The embeddings also come from a network that fits the training molecules much
+better than the held-out ones, so the columns that dominate the splits are the
+ones carrying the most training-set-specific noise.
+
+Probability blending avoids the problem entirely. Each model is fitted on the
+representation that suits it — trees on sparse binary bits, the network on dense
+combinations — and only the two outputs are averaged. Because the two make
+differently-shaped errors, averaging cancels part of the uncorrelated component.
+
+A three-way blend (raw forest + fused forest + network) was also tested and
+reached 0.8083 on validation against 0.8079 for the two-way blend. That
+difference is noise on 782 molecules, so the simpler two-way blend was kept.
+
+### What this means for the original design
+
+The first version of this module was not merely under-tuned: discarding the
+2,048 Morgan bits removed the signal the Phase 1 forest depended on, and no
+forest hyperparameter could compensate. Fusing the bits back in fixes that
+specific loss (0.6785 → 0.7156) but introduces the crowding problem above,
+which is why the shipped ensemble blends probabilities instead.
 
 ---
 
@@ -149,9 +168,10 @@ only if its label for that endpoint exists.
 | Splits | Member 1's frozen scaffold split, unchanged (6259 / 782 / 782) |
 | Descriptor scaling | Fitted on training data only in Phase 1, reused as-is |
 | Model fitting | Forests fitted on the training split only |
-| Model selection | Descriptor question and forest settings decided on **validation** |
+| Model selection | Feature set, forest settings and the blending weight alpha all decided on **validation** |
+| Blending weight | alpha swept on validation only; test scored once at the selected alpha=0.80 |
 | Test usage | Touched once, for the final numbers in section 2 |
-| Row alignment | Molecule order checked between embeddings, descriptors and labels; mismatch raises an error |
+| Row alignment | Molecule order checked between raw features, embeddings, DL probabilities and labels on all three splits; mismatch raises an error |
 
 **One caveat to state openly:** the training embeddings come from a network that
 was itself trained on those same training labels, so the training embeddings
@@ -171,16 +191,28 @@ phase2/member3_hybrid_model/
 ├── configs/
 │   └── hybrid_config.json             # feature sources + forest settings
 ├── src/
-│   ├── hybrid_features.py             # builds the 133-feature matrix
-│   ├── hybrid_model.py                # trains / saves / loads the 12 forests
+│   ├── hybrid_features.py             # builds the 2181-feature fused matrix
+│   ├── hybrid_model.py                # 12 forests + blend_predictions()
+│   ├── dl_predictions.py              # scores Member 2's checkpoint for blending
+│   ├── fusion_study.py                # validation-only study behind section 3
 │   ├── evaluate_hybrid.py             # metrics + three-way comparison
 │   ├── check_rf_settings.py           # validation-only settings check
 │   └── make_diagram.py                # architecture + comparison plots
+├── tests/
+│   └── test_hybrid.py                 # fusion + blending test suite
 ├── models/                            # 12 saved forests, rf_<endpoint>.joblib
 └── reports/
-    ├── test_evaluation.csv            # hybrid per-endpoint test metrics
-    ├── validation_evaluation.csv      # hybrid per-endpoint validation metrics
-    ├── test_predictions.csv           # 9384 rows: 782 molecules x 12 endpoints
+    ├── phase1_vs_phase2_summary.csv   # the headline table in section 2
+    ├── test_evaluation.csv            # fused forest per-endpoint test metrics
+    ├── raw_rf_test_evaluation.csv     # upgraded raw forest test metrics
+    ├── ensemble_test_evaluation.csv   # blended ensemble test metrics
+    ├── ensemble_test_predictions.csv  # 9384 rows: 782 molecules x 12 endpoints
+    ├── test_predictions.csv           # same, for the fused forest
+    ├── validation_evaluation.csv      # per-endpoint validation metrics
+    ├── feature_ablation_validation.csv
+    ├── alpha_tuning_validation.csv    # the alpha sweep
+    ├── fusion_study_features.csv      # section 3 feature-set table
+    ├── fusion_study_blending.csv      # section 3 blending table
     ├── rf_settings_check.csv
     ├── comparison_roc_auc.csv         # (also pr_auc, f1_score, mcc)
     └── plots/
@@ -190,14 +222,20 @@ phase2/member3_hybrid_model/
 
 ### What each main file does
 
-- **`hybrid_features.py`** — reads Member 2's saved embeddings and Member 1's
-  scaled descriptors, checks the molecule order matches, and joins them into
-  133 columns. The `use_descriptors=False` switch is what produced the
-  descriptor ablation in section 2.
+- **`hybrid_features.py`** — reads Member 1's raw 2,053 features and Member 2's
+  saved embeddings, checks the molecule order matches row-for-row, and
+  concatenates them into 2,181 columns. The `use_raw_features` /
+  `use_embeddings` / `use_descriptors` switches produce the four ablation arms
+  in section 3.
 - **`hybrid_model.py`** — `select_observed_rows()` applies the missing-label
   mask; `train_all_endpoints()` fits the 12 forests; `save_forests()` writes
-  them to `models/`. The forest settings are deliberately identical to the
-  Phase 1 baseline so the comparison isolates the features.
+  them to `models/`; `blend_predictions()` implements
+  `alpha * P_rf + (1 - alpha) * P_dl`.
+- **`dl_predictions.py`** — rebuilds Member 2's network from their own config
+  and checkpoint and scores a split with it. Nothing is retrained, so the
+  blended numbers use their model exactly as trained.
+- **`fusion_study.py`** — the validation-only evidence for section 3: the
+  feature-set comparison, the `max_features` attempts, and the alpha sweep.
 - **`evaluate_hybrid.py`** — `evaluate_predictions()` computes per-endpoint
   metrics on observed labels only; `build_comparison()` joins our results with
   the result files the other two members already produced.
@@ -215,6 +253,10 @@ python -m phase2.member3_hybrid_model.train_hybrid
 ```
 
 Then, optionally:
+
+```bash
+python -m phase2.member3_hybrid_model.src.fusion_study
+```
 
 ```bash
 python -m phase2.member3_hybrid_model.src.check_rf_settings
@@ -251,6 +293,6 @@ are 0.7541 and 0.7498. They appear to come from two different Phase 1 runs.
 This module uses `results/metrics.csv` for test comparisons, because that is the
 file containing the full metric set (F1, MCC, balanced accuracy), and
 `model_evaluation_results.csv` only for validation scores, which are the only
-place validation numbers were saved. The conclusion is unaffected: the hybrid
-scores below the standalone forest under either file. Someone should confirm
+place validation numbers were saved. The conclusion is unaffected: the blended
+ensemble scores above the Phase 1 forest under either file. Someone should confirm
 which Phase 1 run is authoritative before the final report.

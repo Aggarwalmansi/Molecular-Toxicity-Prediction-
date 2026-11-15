@@ -4,12 +4,39 @@ loss.py
 Masked and class-weighted multi-task loss for Tox21 molecular toxicity.
 Handles missing labels strictly via boolean masks and penalizes positive misclassifications
 using training-set class weights.
+
+Supports sqrt-damped class weights to prevent extreme gradient spikes on rare endpoints.
 """
 
 from typing import Dict, List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+def compute_sqrt_damped_weights(pos_weight: torch.Tensor, cap: float = 10.0) -> torch.Tensor:
+    """
+    Apply sqrt damping and optional capping to raw inverse-frequency class weights.
+
+    Raw pos_weight = N_neg / N_pos can be extremely large for rare endpoints
+    (e.g., 38.85 for NR-PPAR-gamma), causing gradient spikes that destabilize
+    training. Sqrt damping compresses the range while preserving the relative
+    ordering of endpoint importance.
+
+    Parameters
+    ----------
+    pos_weight : torch.Tensor
+        Raw positive class weights (N_neg / N_pos).
+    cap : float, default 10.0
+        Maximum allowed weight after damping.
+
+    Returns
+    -------
+    torch.Tensor
+        Sqrt-damped and capped weights.
+    """
+    damped = torch.sqrt(pos_weight)
+    return torch.clamp(damped, max=cap)
 
 
 class MaskedWeightedBCEWithLogitsLoss(nn.Module):
@@ -26,16 +53,25 @@ class MaskedWeightedBCEWithLogitsLoss(nn.Module):
     ----------
     pos_weight : torch.Tensor of shape (num_endpoints,)
         Positive class weights w_j = N_neg / N_pos calculated strictly on train set.
+    use_sqrt_damping : bool, default True
+        If True, applies sqrt damping to reduce extreme weight magnitudes.
+    weight_cap : float, default 10.0
+        Maximum weight value after damping.
     eps : float, default 1e-8
         Numerical stability epsilon to prevent zero-division when batch mask has 0 observed.
     """
 
-    def __init__(self, pos_weight: Optional[torch.Tensor] = None, eps: float = 1e-8):
+    def __init__(self, pos_weight: Optional[torch.Tensor] = None,
+                 use_sqrt_damping: bool = True,
+                 weight_cap: float = 10.0,
+                 eps: float = 1e-8):
         super().__init__()
         self.eps = eps
         if pos_weight is not None:
             if not isinstance(pos_weight, torch.Tensor):
                 pos_weight = torch.tensor(pos_weight, dtype=torch.float32)
+            if use_sqrt_damping:
+                pos_weight = compute_sqrt_damped_weights(pos_weight.float(), cap=weight_cap)
             self.register_buffer("pos_weight", pos_weight.float())
         else:
             self.pos_weight = None

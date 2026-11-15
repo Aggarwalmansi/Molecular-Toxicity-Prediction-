@@ -47,11 +47,18 @@ def featurize(smiles):
     return canonical, np.concatenate([bits, scaled], axis=1).astype(np.float32), scaled
 
 
-@lru_cache(maxsize=1)
-def load_neural_model():
+@lru_cache(maxsize=2)
+def load_neural_model(verify=True):
+    """Load the trained network, refusing a checkpoint the bundle was not built from.
+
+    prepare_models passes verify=False: it is the step that re-stamps the hash,
+    so it must be able to load a checkpoint the current bundle predates.
+    Prediction always verifies, so the demo can never score a molecule with a
+    network the shipped Random Forests were not fitted against.
+    """
     checkpoint_path = DL_DIR / 'checkpoints/best_multitask_model.pt'
     metadata_path = ML_DIR / 'bundle.json'
-    if metadata_path.exists():
+    if verify and metadata_path.exists():
         expected = json.loads(metadata_path.read_text())['checkpoint_sha256']
         if hashlib.sha256(checkpoint_path.read_bytes()).hexdigest() != expected:
             raise ValueError('Checkpoint changed. Run prepare_models again before predicting.')

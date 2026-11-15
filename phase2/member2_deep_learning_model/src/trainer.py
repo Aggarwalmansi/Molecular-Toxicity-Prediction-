@@ -3,10 +3,9 @@ trainer.py
 ==========
 Training and validation harness for MultiTaskToxicNet.
 Includes:
-- Masked loss computation
-- Class weighting
-- Learning rate scheduling
-- Early stopping
+- Masked loss computation with sqrt-damped class weights
+- Cosine annealing warm restarts LR scheduling
+- Early stopping on validation macro ROC-AUC
 - Training metrics logging and plotting
 - Checkpointing
 """
@@ -44,13 +43,16 @@ class MultiTaskTrainer:
         val_loader: DataLoader,
         test_loader: DataLoader,
         pos_weight: Optional[torch.Tensor] = None,
-        learning_rate: float = 1e-3,
-        weight_decay: float = 1e-4,
+        learning_rate: float = 3e-4,
+        weight_decay: float = 1e-3,
         device: Optional[torch.device] = None,
         checkpoint_dir: Optional[Union[str, Path]] = None,
         report_dir: Optional[Union[str, Path]] = None,
         target_assays: Optional[List[str]] = None,
         early_stopping_metric: str = "val_macro_roc_auc",
+        use_sqrt_damping: bool = True,
+        weight_cap: float = 10.0,
+        scheduler_config: Optional[Dict[str, Any]] = None,
     ):
         if device is None:
             if torch.backends.mps.is_available():
@@ -82,22 +84,38 @@ class MultiTaskTrainer:
         self.report_dir.mkdir(parents=True, exist_ok=True)
         self.plot_dir.mkdir(parents=True, exist_ok=True)
 
-        # Loss function with positive class weights
-        self.criterion = MaskedWeightedBCEWithLogitsLoss(pos_weight=pos_weight)
+        # Loss function with sqrt-damped positive class weights
+        self.criterion = MaskedWeightedBCEWithLogitsLoss(
+            pos_weight=pos_weight,
+            use_sqrt_damping=use_sqrt_damping,
+            weight_cap=weight_cap,
+        )
 
-        # Optimizer and LR Scheduler
+        # Optimizer: AdamW with stronger weight decay for regularization
         self.optimizer = optim.AdamW(
             self.model.parameters(),
             lr=learning_rate,
             weight_decay=weight_decay,
         )
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer,
-            mode="max" if early_stopping_metric == "val_macro_roc_auc" else "min",
-            factor=0.5,
-            patience=5,
-            min_lr=1e-5,
-        )
+
+        # LR Scheduler: Cosine Annealing with Warm Restarts for smoother convergence
+        if scheduler_config and scheduler_config.get("type") == "CosineAnnealingWarmRestarts":
+            self.scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                self.optimizer,
+                T_0=scheduler_config.get("T_0", 20),
+                T_mult=scheduler_config.get("T_mult", 2),
+                eta_min=scheduler_config.get("eta_min", 1e-6),
+            )
+            self._cosine_scheduler = True
+        else:
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode="max" if early_stopping_metric == "val_macro_roc_auc" else "min",
+                factor=0.5,
+                patience=5,
+                min_lr=1e-5,
+            )
+            self._cosine_scheduler = False
 
         self.history: List[Dict[str, Any]] = []
         self.best_score = float("-inf") if early_stopping_metric == "val_macro_roc_auc" else float("inf")
@@ -122,7 +140,7 @@ class MultiTaskTrainer:
             loss = self.criterion(logits, y_batch, mask_batch)
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5.0)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=2.0)
             self.optimizer.step()
 
             total_loss += loss.item()
@@ -193,7 +211,7 @@ class MultiTaskTrainer:
 
         return avg_loss, macro_roc, macro_pr, per_endpoint_roc, per_endpoint_pr
 
-    def fit(self, max_epochs: int = 100, patience: int = 15) -> Dict[str, Any]:
+    def fit(self, max_epochs: int = 150, patience: int = 20) -> Dict[str, Any]:
         """
         Train with early stopping and save best checkpoint.
         """
@@ -211,8 +229,11 @@ class MultiTaskTrainer:
             current_lr = self.optimizer.param_groups[0]["lr"]
 
             # Step scheduler
-            current_metric = val_roc if is_maximize else val_loss
-            self.scheduler.step(current_metric)
+            if self._cosine_scheduler:
+                self.scheduler.step(epoch)
+            else:
+                current_metric = val_roc if is_maximize else val_loss
+                self.scheduler.step(current_metric)
 
             record = {
                 "epoch": epoch,
@@ -224,6 +245,7 @@ class MultiTaskTrainer:
             }
             self.history.append(record)
 
+            current_metric = val_roc if is_maximize else val_loss
             improved = (current_metric > self.best_score) if is_maximize else (current_metric < self.best_score)
 
             if epoch % 5 == 0 or epoch == 1 or improved:

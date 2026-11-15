@@ -1,0 +1,8 @@
+Configuration,Features,Val macro ROC-AUC,Val macro PR-AUC
+"raw 2053, Phase 1 RF settings",2053,0.7866,0.4643
+"raw 2053, upgraded RF",2053,0.8044,0.4736
+"raw 2053, upgraded RF, max_features=0.1",2053,0.8055,0.4713
+"fused 2181, upgraded RF",2181,0.78,0.4185
+"fused 2181, upgraded RF, max_features=0.1",2181,0.7783,0.4143
+"fused 2181, upgraded RF, max_features=0.3",2181,0.7658,0.4094
+"fused 2181, upgraded RF, max_features=log2",2181,0.7881,0.4139
