@@ -6,7 +6,7 @@ A3: Improves the ML + DL hybrid model.
 Background. The original hybrid trained a Random Forest on 128 embeddings
 taken from Member 2's network. Those embeddings turned out to come from the
 network's FINAL epoch rather than its best epoch, because of the state_dict
-aliasing bug fixed in member2_deep_learning_model/src/trainer.py. By the final
+aliasing bug fixed in deep_learning/src/trainer.py. By the final
 epoch the network had memorised the training set (train loss 0.15, validation
 loss 4.0), so the training embeddings were almost perfectly separable while
 the test embeddings were not. The second stage therefore learned a geometry
@@ -31,9 +31,9 @@ from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, roc_auc_score
 
-from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
-from phase2.member2_deep_learning_model.src.model import MultiTaskToxicNet
-from phase2.member3_hybrid_model.src.hybrid_model import TARGET_ASSAYS
+from phase2.data.src.data_loader import Tox21DataLoader
+from phase2.deep_learning.src.model import MultiTaskToxicNet
+from phase2.hybrid.src.hybrid_model import TARGET_ASSAYS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = PROJECT_ROOT / "phase2" / "experiments" / "results"
@@ -182,10 +182,10 @@ def main():
     train_labels, train_mask, _ = loader.load_labels(split="train")
 
     member2_checkpoint = (
-        PROJECT_ROOT / "phase2" / "member2_deep_learning_model" / "checkpoints" / "best_multitask_model.pt"
+        PROJECT_ROOT / "phase2" / "deep_learning" / "checkpoints" / "best_multitask_model.pt"
     )
     member4_checkpoint = (
-        PROJECT_ROOT / "phase2" / "member4_evaluation" / "checkpoints" / "class_weight" / "model_weighted_loss_seed_42.pt"
+        PROJECT_ROOT / "phase2" / "evaluation" / "checkpoints" / "class_weight" / "model_weighted_loss_seed_42.pt"
     )
 
     print("=" * 72)
@@ -194,7 +194,7 @@ def main():
 
     # The embeddings the original hybrid actually used, saved by Member 2
     original_embeddings_file = (
-        PROJECT_ROOT / "phase2" / "member2_deep_learning_model" / "embeddings" / "train_embeddings.parquet"
+        PROJECT_ROOT / "phase2" / "deep_learning" / "embeddings" / "train_embeddings.parquet"
     )
     original_train = pd.read_parquet(original_embeddings_file)
     original_train = original_train.drop(columns=["molecule_id"]).values.astype(np.float64)
@@ -239,7 +239,7 @@ def main():
     for split in SPLITS:
         name = "val" if split == "val" else split
         table = pd.read_parquet(
-            PROJECT_ROOT / "phase2" / "member2_deep_learning_model" / "embeddings" / f"{name}_embeddings.parquet"
+            PROJECT_ROOT / "phase2" / "deep_learning" / "embeddings" / f"{name}_embeddings.parquet"
         )
         original_embeddings[split] = table.drop(columns=["molecule_id"]).values.astype(np.float64)
 

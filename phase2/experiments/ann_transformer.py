@@ -27,7 +27,7 @@ How the Transformer branch works, in plain English:
 import torch
 import torch.nn as nn
 
-from phase2.member2_deep_learning_model.src.model import MultiTaskToxicNet
+from phase2.deep_learning.src.model import MultiTaskToxicNet
 
 
 class AnnTransformerHybrid(nn.Module):

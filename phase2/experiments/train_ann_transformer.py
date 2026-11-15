@@ -37,8 +37,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from phase2.experiments.ann_transformer import AnnTransformerHybrid
 from phase2.experiments.smiles_tokenizer import build_vocabulary, encode_many, split_smiles
-from phase2.member1_data_pipeline.src.data_loader import TARGET_ASSAYS, Tox21DataLoader
-from phase2.member2_deep_learning_model.src.loss import MaskedWeightedBCEWithLogitsLoss
+from phase2.data.src.data_loader import TARGET_ASSAYS, Tox21DataLoader
+from phase2.deep_learning.src.loss import MaskedWeightedBCEWithLogitsLoss
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPLIT_FILE = PROJECT_ROOT / "tox21_member2_handoff" / "artifacts" / "corrected_scaffold_split.csv"

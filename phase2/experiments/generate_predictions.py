@@ -29,9 +29,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 
-from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
-from phase2.member2_deep_learning_model.src.model import MultiTaskToxicNet
-from phase2.member3_hybrid_model.src.hybrid_model import TARGET_ASSAYS
+from phase2.data.src.data_loader import Tox21DataLoader
+from phase2.deep_learning.src.model import MultiTaskToxicNet
+from phase2.hybrid.src.hybrid_model import TARGET_ASSAYS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = PROJECT_ROOT / "phase2" / "experiments" / "predictions"
@@ -207,7 +207,7 @@ def get_network_runs():
     These are Member 4's nine multi-task runs (three configurations, three
     seeds each) plus Member 2's original checkpoint.
     """
-    member4_dir = PROJECT_ROOT / "phase2" / "member4_evaluation" / "checkpoints"
+    member4_dir = PROJECT_ROOT / "phase2" / "evaluation" / "checkpoints"
     runs = []
 
     for configuration, folder in [
@@ -226,7 +226,7 @@ def get_network_runs():
                 runs.append((f"dl_{configuration}_seed{seed}", path, dropout))
 
     member2_checkpoint = (
-        PROJECT_ROOT / "phase2" / "member2_deep_learning_model" / "checkpoints" / "best_multitask_model.pt"
+        PROJECT_ROOT / "phase2" / "deep_learning" / "checkpoints" / "best_multitask_model.pt"
     )
     if member2_checkpoint.exists():
         runs.append(("dl_member2_checkpoint", member2_checkpoint, 0.35))
