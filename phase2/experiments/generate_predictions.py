@@ -26,6 +26,8 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 
 from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
 from phase2.member2_deep_learning_model.src.model import MultiTaskToxicNet
@@ -135,6 +137,67 @@ def predict_with_phase1_forest(loader):
             )[:, 1]
 
     return probabilities_by_split
+
+
+def predict_with_phase1_baseline(kind, loader):
+    """
+    Refits the Phase 1 Logistic Regression or Decision Tree.
+
+    Phase 1 saved only test predictions for these two, and an ensemble weight
+    has to be chosen on validation, so we need validation predictions as well.
+    The settings below are copied from train_models.py (get_models). That file
+    is Phase 1 and is only read, never edited.
+    """
+    if kind == "lr":
+        def make_model():
+            return LogisticRegression(max_iter=1000, class_weight="balanced", random_state=42)
+    elif kind == "dt":
+        def make_model():
+            return DecisionTreeClassifier(max_depth=10, class_weight="balanced", random_state=42)
+    else:
+        raise ValueError(f"Unknown baseline '{kind}'. Use 'lr' or 'dt'.")
+
+    train_features, _ = loader.load_features("combined", split="train")
+    train_labels, train_mask, _ = loader.load_labels(split="train")
+
+    split_features = {}
+    probabilities_by_split = {}
+    for split in SPLITS:
+        split_features[split], _ = loader.load_features("combined", split=split)
+        probabilities_by_split[split] = np.zeros(
+            (len(split_features[split]), len(TARGET_ASSAYS))
+        )
+
+    for endpoint_index in range(len(TARGET_ASSAYS)):
+        observed = np.where(train_mask[:, endpoint_index])[0]
+        model = make_model()
+        model.fit(train_features[observed], train_labels[observed, endpoint_index].astype(int))
+        for split in SPLITS:
+            probabilities_by_split[split][:, endpoint_index] = model.predict_proba(
+                split_features[split]
+            )[:, 1]
+
+    return probabilities_by_split
+
+
+def add_phase1_baselines():
+    """
+    Writes validation and test predictions for the two Phase 1 baselines into
+    their own file, so the eleven predictions that already exist are left
+    alone rather than regenerated.
+    """
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    loader = Tox21DataLoader()
+
+    tables = []
+    for kind, model_name in [("lr", "lr_phase1"), ("dt", "dt_phase1")]:
+        print(f"  refitting {model_name} on the training split")
+        probabilities = predict_with_phase1_baseline(kind, loader)
+        tables.append(build_long_table(probabilities, model_name, loader))
+
+    output_file = OUTPUT_DIR / "phase1_baseline_predictions.parquet"
+    pd.concat(tables, ignore_index=True).to_parquet(output_file, index=False)
+    print(f"  saved {output_file.name}")
 
 
 def get_network_runs():

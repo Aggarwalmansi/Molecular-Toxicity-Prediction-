@@ -1,0 +1,13 @@
+endpoint,chosen_model,val_mean_of_both
+NR-AR,phase2_tuned_blend,0.6803
+NR-AR-LBD,phase2_tuned_blend,0.8221
+NR-AhR,phase2_tuned_blend,0.7037
+NR-Aromatase,rf_plus_dl6_rank_w3,0.5576
+NR-ER,rf_plus_dl6_rank_w3,0.6283
+NR-ER-LBD,phase2_tuned_blend,0.6868
+NR-PPAR-gamma,dl6_alone,0.475
+SR-ARE,phase2_tuned_blend,0.6736
+SR-ATAD5,phase2_tuned_blend,0.5881
+SR-HSE,phase2_tuned_blend,0.5942
+SR-MMP,phase2_tuned_blend,0.7338
+SR-p53,rf_phase1,0.6351

@@ -1,0 +1,5 @@
+method,val_roc_auc,val_pr_auc,val_mean_of_both,use_ranks,calibrated
+rank_average (Part A choice),0.819,0.4561,0.6376,True,False
+raw_probability_average,0.8145,0.451,0.6327,False,False
+calibrated_probability_average,0.8112,0.4491,0.6301,False,True
+calibrated_rank_average,0.7903,0.4186,0.6045,True,True

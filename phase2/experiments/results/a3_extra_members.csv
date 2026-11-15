@@ -1,0 +1,6 @@
+members_added,val_roc_auc,val_pr_auc,val_mean_of_both,kept
+none (base),0.8161,0.4674,0.6418,True
+lr_phase1,0.8157,0.4669,0.6413,False
+dt_phase1,0.8181,0.4669,0.6425,True
+feature_hybrid,0.8198,0.4675,0.6436,True
+ann_transformer,0.8206,0.4624,0.6415,False
