@@ -164,7 +164,69 @@ def make_comparison_plot(output_dir):
             axis.legend(fontsize=9, loc="upper right", ncol=3)
 
     plt.tight_layout()
-    output_file = output_dir / "model_comparison.png"
+    output_file = output_dir / "hybrid_model_comparison.png"
+    plt.savefig(output_file, dpi=160, bbox_inches="tight", facecolor="white")
+    plt.close(figure)
+    print(f"Saved {output_file}")
+
+
+
+
+def make_final_model_diagram(output_dir):
+    """
+    Draws the recommended final Phase 2 model: the nine-member rank-average
+    ensemble. This is the diagram to put on a slide.
+
+    Reading it left to right: three different kinds of model are trained on
+    the same training split, each produces a probability per endpoint, those
+    probabilities are turned into ranks, the ranks are averaged with the
+    Random Forest counting nine times, and one tuned cutoff per endpoint turns
+    the blended score into a toxic / not-toxic call.
+    """
+    figure, axis = plt.subplots(figsize=(12, 7))
+    axis.set_xlim(0, 12)
+    axis.set_ylim(0, 8)
+    axis.axis("off")
+
+    axis.text(6, 7.6, "Final Phase 2 Model — Nine-Member Rank-Average Ensemble",
+              ha="center", fontsize=13, fontweight="bold")
+    axis.text(6, 7.2, "every weight, member and threshold chosen on validation only",
+              ha="center", fontsize=9, color="#555555", style="italic")
+
+    draw_box(axis, 0.3, 5.8, 2.6, 0.9,
+             "Tox21 molecule\n2048 Morgan bits\n+ 5 descriptors", NEUTRAL_COLOUR, fontsize=8.5)
+
+    members = [
+        (4.6, "Random Forest\n(Phase 1)", "weight 9", HYBRID_COLOUR),
+        (3.3, "6 neural networks\n(3 seeds x 2 losses)", "weight 1 each", DL_COLOUR),
+        (2.0, "Decision Tree\n(Phase 1)", "weight 1", HYBRID_COLOUR),
+        (0.7, "ExtraTrees on\n128-d embeddings", "weight 1", DESCRIPTOR_COLOUR),
+    ]
+    for y, label, weight, colour in members:
+        draw_arrow(axis, (2.9, 6.25), (3.7, y + 0.35))
+        draw_box(axis, 3.7, y, 2.7, 0.7, label, colour, fontsize=8.5)
+        axis.text(6.55, y + 0.35, weight, fontsize=8, va="center", color="#444444")
+        draw_arrow(axis, (7.5, y + 0.35), (8.3, 3.6))
+
+    draw_box(axis, 8.3, 3.2, 3.3, 0.85,
+             "rank each model per endpoint,\nthen weighted average", DL_COLOUR, fontsize=8.5)
+    draw_arrow(axis, (9.95, 3.2), (9.95, 2.5))
+    draw_box(axis, 8.3, 1.7, 3.3, 0.8,
+             "one cutoff per endpoint,\ntuned on validation", DESCRIPTOR_COLOUR, fontsize=8.5)
+    draw_arrow(axis, (9.95, 1.7), (9.95, 1.0))
+    draw_box(axis, 8.3, 0.3, 3.3, 0.7,
+             "12 toxic / not-toxic calls", NEUTRAL_COLOUR, fontsize=9)
+
+    axis.text(0.3, 4.3,
+              "Why ranks, not probabilities:\nthe members disagree about\nscale far more than about\norder. Ranking makes each\nmodel an equal voter.\n\nCalibrating instead was\ntried and scored worse\non validation.",
+              fontsize=8, va="top", color="#333333", linespacing=1.6)
+
+    axis.text(6, 0.0,
+              "Test: ROC-AUC 0.7746 vs Phase 1 0.7541  |  PR-AUC 0.4000 vs 0.3962  |  MCC 0.3407 vs 0.3394",
+              ha="center", fontsize=8.5, color="#222222")
+
+    plt.tight_layout()
+    output_file = output_dir / "final_model_architecture.png"
     plt.savefig(output_file, dpi=160, bbox_inches="tight", facecolor="white")
     plt.close(figure)
     print(f"Saved {output_file}")
@@ -172,3 +234,4 @@ def make_comparison_plot(output_dir):
 
 if __name__ == "__main__":
     main()
+    make_final_model_diagram(PLOTS_DIR)
