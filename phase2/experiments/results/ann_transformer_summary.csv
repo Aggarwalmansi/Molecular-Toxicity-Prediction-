@@ -1,0 +1,4 @@
+configuration,val_mean,val_std,test_mean,test_std
+ann_only,0.7762,0.009,0.7211,0.0093
+hybrid,0.7824,0.0008,0.7339,0.0117
+smiles_only,0.7437,0.0079,0.7344,0.0153

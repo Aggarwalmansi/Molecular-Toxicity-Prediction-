@@ -1,0 +1,10 @@
+configuration,seed,best_epoch,val_roc_auc,test_roc_auc,minutes
+ann_only,7,3,0.766,0.713,0.09
+ann_only,21,3,0.7793,0.719,0.06
+ann_only,42,3,0.7832,0.7312,0.06
+smiles_only,7,13,0.7357,0.7222,2.51
+smiles_only,21,21,0.7439,0.7516,3.59
+smiles_only,42,36,0.7515,0.7295,5.28
+hybrid,7,2,0.7832,0.7279,1.11
+hybrid,21,2,0.7817,0.7474,1.14
+hybrid,42,3,0.7824,0.7265,1.3
