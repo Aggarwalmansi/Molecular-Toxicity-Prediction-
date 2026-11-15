@@ -278,7 +278,11 @@ class MultiTaskTrainer:
 
         # Reload best model weights
         if best_state is not None:
-            self.model.load_state_dict(best_state["model_state_dict"])
+            # state_dict tensors share storage with the live model. Reload the
+            # frozen on-disk checkpoint rather than the mutable in-memory copy.
+            saved = torch.load(self.checkpoint_dir / "best_multitask_model.pt",
+                               map_location=self.device, weights_only=True)
+            self.model.load_state_dict(saved["model_state_dict"])
             print(f"[MultiTaskTrainer] Restored best model weights from epoch {self.best_epoch} (Val Loss: {self.best_val_loss:.4f}, Val ROC-AUC: {best_val_roc:.4f})")
 
         return {

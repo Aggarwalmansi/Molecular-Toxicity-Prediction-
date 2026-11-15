@@ -1,480 +1,184 @@
-"""
-app.py
-======
-Tox21 Molecular Toxicity Prediction Platform - Team Presentation Dashboard
-Comprehensive Multi-Member Showcase:
-- Member 1: Dataset Preprocessing, Quality Audits & Bemis–Murcko Scaffold Split
-- Member 2: Feature Engineering, Variance Filtering & Univariate Feature Selection
-- Member 3: Baseline Classifiers, Hyperparameters & Training Dynamics
-- Member 4: Rigorous Evaluation, Bootstrap CIs, Paired Significance & Error Analysis
-- Interactive Live Demo: 2D Chemical Structure Rendering & Live Toxicity Prediction
-"""
-
-import json
+"""Unified Tox21 project dashboard: evidence, models and saved-model inference."""
 from pathlib import Path
-from typing import Tuple
-
-import matplotlib.pyplot as plt
-import numpy as np
+import json
 import pandas as pd
 import streamlit as st
-from PIL import Image
 
-# RDKit import for chemical structure drawing and live featurization
-try:
-    from rdkit import Chem
-    from rdkit.Chem import Descriptors, Lipinski, Draw, rdFingerprintGenerator
-    RDKIT_AVAILABLE = True
-except ImportError:
-    RDKIT_AVAILABLE = False
+ROOT = Path(__file__).resolve().parent
+P2 = ROOT / 'phase2'
+DATA = ROOT / 'tox21_member2_handoff/artifacts'
+EVAL = P2 / 'member4_evaluation'
+DEMO = P2 / 'member5_demo_submission'
 
-
-# ==============================================================================
-# Page Setup & Styling
-# ==============================================================================
-
-st.set_page_config(
-    page_title="Tox21 Molecular Toxicity Platform",
-    page_icon="🧪",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-RESULTS_DIR = SCRIPT_DIR / "results"
-PLOTS_DIR = RESULTS_DIR / "plots"
-MEMBER1_DIR = SCRIPT_DIR / "tox21_project"
-MEMBER2_DIR = SCRIPT_DIR / "tox21_member2_handoff" / "artifacts"
-
-TARGET_ASSAYS = [
-    "NR-AR", "NR-AR-LBD", "NR-AhR", "NR-Aromatase", "NR-ER", "NR-ER-LBD",
-    "NR-PPAR-gamma", "SR-ARE", "SR-ATAD5", "SR-HSE", "SR-MMP", "SR-p53"
-]
-
-ASSAY_NAMES = {
-    "NR-AR": "Androgen Receptor (Full Target)",
-    "NR-AR-LBD": "Androgen Receptor (Ligand Binding Domain)",
-    "NR-AhR": "Aryl Hydrocarbon Receptor",
-    "NR-Aromatase": "Aromatase Enzyme (CYP19A1)",
-    "NR-ER": "Estrogen Receptor (Full Target)",
-    "NR-ER-LBD": "Estrogen Receptor (Ligand Binding Domain)",
-    "NR-PPAR-gamma": "Peroxisome Proliferator-Activated Receptor γ",
-    "SR-ARE": "Antioxidant Response Element (Nrf2)",
-    "SR-ATAD5": "DNA Damage Response (ATAD5)",
-    "SR-HSE": "Heat Shock Response Element",
-    "SR-MMP": "Mitochondrial Membrane Potential Disruption",
-    "SR-p53": "p53 Tumor Suppressor Pathway",
+st.set_page_config(page_title='Tox21 | Molecular Intelligence', page_icon='🧬', layout='wide')
+st.markdown('''<style>
+.block-container {max-width:1250px;padding-top:2rem;}
+[data-testid="stMetric"] {background:#edf5f5;border-radius:10px;padding:16px;}
+[data-testid="stMetric"] [data-testid="stMetricValue"],
+[data-testid="stMetric"] [data-testid="stMetricValue"] * {color:#123747 !important;}
+[data-testid="stMetric"] [data-testid="stMetricLabel"],
+[data-testid="stMetric"] [data-testid="stMetricLabel"] * {color:#365867 !important;}
+h1,h2,h3 {color:#123747;}
+[data-testid="stSidebar"] {background:#123747;color:#f1f7fa;}
+[data-testid="stSidebar"] :is(h1,h2,h3,p,label,span,small) {color:#f1f7fa !important;}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {color:#c5d8e2 !important;}
+[data-testid="stSidebar"] [role="radiogroup"] label {
+    padding:10px 12px;border-radius:8px;margin-bottom:5px;
 }
-
-
-# ==============================================================================
-# Helper Data Loaders
-# ==============================================================================
+[data-testid="stSidebar"] [role="radiogroup"] label:hover {background:#205166;}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+    background:#206274;outline:1px solid #64d3cb;
+}
+[data-testid="stSidebar"] button {color:#f1f7fa;}
+[data-testid="stSidebar"] hr {border-color:#527584;}
+</style>''', unsafe_allow_html=True)
 
 @st.cache_data
-def load_all_artifacts():
-    """Loads CSV artifacts from all project members."""
-    data = {}
-    
-    # Member 1 artifacts
-    summary_path = MEMBER1_DIR / "dataset_summary.csv"
-    excl_path = MEMBER1_DIR / "exclusion_report.csv"
-    dup_path = MEMBER1_DIR / "duplicate_audit.csv"
-    if summary_path.exists():
-        data["m1_summary"] = pd.read_csv(summary_path)
-    if excl_path.exists():
-        data["m1_exclusion"] = pd.read_csv(excl_path)
-    if dup_path.exists():
-        data["m1_duplicates"] = pd.read_csv(dup_path)
+def read_csv(path):
+    return pd.read_csv(path) if path.exists() else pd.DataFrame()
 
-    # Member 2 artifacts
-    feat_sel_path = MEMBER2_DIR / "feature_selection_summary.csv"
-    scaler_path = MEMBER2_DIR / "scaler_descriptors.json"
-    if feat_sel_path.exists():
-        data["m2_feat_sel"] = pd.read_csv(feat_sel_path)
-    if scaler_path.exists():
-        with open(scaler_path) as f:
-            data["m2_scaler"] = json.load(f)
+@st.cache_data
+def metadata():
+    return pd.read_parquet(DATA / 'labels_and_splits.parquet')
 
-    # Member 3 artifacts
-    m3_results_path = SCRIPT_DIR / "model_evaluation_results.csv"
-    if m3_results_path.exists():
-        data["m3_results"] = pd.read_csv(m3_results_path)
+def table_file(path):
+    frame = read_csv(path)
+    if frame.empty:
+        st.info('This result is not available in the current checkout.')
+    else:
+        st.dataframe(frame, hide_index=True, use_container_width=True)
+    return frame
 
-    # Member 4 artifacts
-    m4_metrics_path = RESULTS_DIR / "metrics.csv"
-    m4_stats_path = RESULTS_DIR / "statistical_tests.csv"
-    m4_split_path = RESULTS_DIR / "split_comparison.csv"
-    m4_preds_path = RESULTS_DIR / "test_predictions.csv"
-    if m4_metrics_path.exists():
-        data["m4_metrics"] = pd.read_csv(m4_metrics_path)
-    if m4_stats_path.exists():
-        data["m4_stats"] = pd.read_csv(m4_stats_path)
-    if m4_split_path.exists():
-        data["m4_split"] = pd.read_csv(m4_split_path)
-    if m4_preds_path.exists():
-        data["m4_preds"] = pd.read_csv(m4_preds_path)
+def plot(path, caption):
+    if path.exists():
+        st.image(str(path), caption=caption, use_container_width=True)
 
-    return data
+with st.sidebar:
+    st.title('🧬 Tox21')
+    st.caption('MOLECULAR ACTIVITY PREDICTION')
+    page = st.radio('Explore the project', ['Overview', 'Data & molecular features', 'Model architectures', 'Experiments & results', 'Predict a molecule', 'Report & presentation'])
+    st.divider()
+    st.write('**Machine learning + deep learning**')
+    st.caption('12 biological assays · one frozen scaffold split · reproducible inference')
 
+st.title(page)
+metrics = read_csv(DEMO / 'models/inference_metrics.csv')
+summary = metrics[metrics['split'].eq('test')].groupby('model')[['roc_auc','average_precision']].mean() if not metrics.empty else pd.DataFrame()
 
-def render_mol_image(smiles: str, size: Tuple[int, int] = (300, 200)):
-    """Draws 2D chemical structure image using RDKit."""
-    if not RDKIT_AVAILABLE:
-        return None
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            return None
-        return Draw.MolToImage(mol, size=size)
-    except Exception:
-        return None
+if page == 'Overview':
+    st.markdown('## Can molecular structure predict biological activity?')
+    st.write('We compare classical classifiers, a multitask neural network, and a hybrid Random Forest across 12 Tox21 assays. The project follows molecules from structure validation through controlled experiments to predictions from saved models.')
+    a,b,c,d = st.columns(4)
+    a.metric('Valid molecules','7,823'); b.metric('Assay endpoints','12'); c.metric('Input features','2,053'); d.metric('Test molecules','782')
+    st.subheader('The complete workflow')
+    st.graphviz_chart('digraph {rankdir=LR; node [shape=box, style="rounded,filled",fillcolor="#edf5f5",fontname="Arial"]; "SMILES" -> "Clean & scaffold split" -> "Fingerprints + descriptors" -> "ML / multitask DL / hybrid" -> "Evaluate & predict";}')
+    left,right = st.columns([1.5,1])
+    with left:
+        st.subheader('Verified inference models')
+        if not summary.empty:
+            st.bar_chart(summary.rename(columns={'roc_auc':'ROC-AUC','average_precision':'Average precision'}), color=['#153d50','#00a69c'])
+    with right:
+        st.subheader('What we learned')
+        st.write('**Random Forest remains the strongest model** in the verified inference bundle. Shared neural learning is promising, but the tested hybrid does not exceed the standalone models.')
+        st.write('**Reproducibility matters.** Integration checks uncovered a checkpoint/embedding mismatch. The demo uses a separately rebuilt, consistent model bundle.')
+        st.caption('Scores shown here describe the live demo models. Historical and three-seed experiments are labelled separately in Experiments & results.')
+    st.info('Use “Predict a molecule” to compare RF, neural-network and hybrid scores for a new SMILES string.')
 
+elif page == 'Data & molecular features':
+    frame = metadata(); endpoints = [c for c in frame if c.startswith(('NR-','SR-'))]
+    st.write('The curated dataset contains 7,823 valid molecular structures. Unmeasured assay labels remain missing and are excluded from loss and evaluation.')
+    a,b = st.columns(2)
+    with a:
+        st.subheader('Frozen scaffold partition')
+        st.dataframe(pd.DataFrame({'Partition':['Train','Validation','Test'],'Molecules':[6259,782,782],'Purpose':['Fit models and scaler','Select settings and checkpoint','Final evaluation']}),hide_index=True,use_container_width=True)
+        st.caption('All live models use the same artifact split. The earlier raw-data manifest is a different partition and is not mixed into these comparisons.')
+    with b:
+        st.subheader('Observed and missing labels')
+        counts = pd.DataFrame({'Active':frame[endpoints].eq(1).sum(),'Inactive':frame[endpoints].eq(0).sum(),'Missing':frame[endpoints].isna().sum()})
+        st.bar_chart(counts)
+    st.subheader('A molecule becomes 2,053 numbers')
+    st.dataframe(pd.DataFrame({'Representation':['Morgan fingerprint','Molecular descriptors'],'Size':[2048,5],'Meaning':['Radius-2 local substructures','MolWt, TPSA, MolLogP, H-bond donors and acceptors'],'Preprocessing':['Binary bits','Standardized using training statistics only']}),hide_index=True,use_container_width=True)
+    assay = st.selectbox('Inspect assay labels',endpoints)
+    st.dataframe(frame[['mol_id','smiles','split',assay]].head(100),hide_index=True,use_container_width=True)
 
-# ==============================================================================
-# Header & Project Overview
-# ==============================================================================
+elif page == 'Model architectures':
+    ml,dl,hybrid = st.tabs(['Classical machine learning','Multitask neural network','ML + DL hybrid'])
+    with ml:
+        st.subheader('Three interpretable reference methods')
+        st.dataframe(pd.DataFrame({'Model':['Logistic Regression','Decision Tree','Random Forest'],'Configuration':['Balanced classes; max_iter=1000','Balanced classes; max_depth=10','100 trees; max_depth=12; balanced classes'],'Training':['One model per endpoint']*3}),hide_index=True,use_container_width=True)
+        st.write('Each classifier learns from observed labels for its endpoint. Random Forest captures nonlinear feature interactions directly from the original molecular fingerprint and descriptors.')
+    with dl:
+        config=json.loads((P2/'member2_deep_learning_model/configs/model_config.json').read_text())
+        st.subheader('One shared network, 12 independent outputs')
+        st.graphviz_chart('digraph {rankdir=LR; node [shape=box,style="rounded,filled",fillcolor="#edf5f5",fontname="Arial"]; "2053 inputs" -> "512 + BN + ReLU" -> "256 + BN + ReLU" -> "128 bottleneck" -> "12 logits" -> "Sigmoid scores";}')
+        st.write('The shared layers learn representations across assays. Each output is an independent binary activity prediction, so multiple assays can be active for one molecule.')
+        a,b,c=st.columns(3); a.metric('Trunk dropout','0.35'); b.metric('Bottleneck dropout','0.175'); c.metric('Batch size','64')
+        st.markdown('**Masked weighted BCE:** missing labels contribute no loss; positive-class weights come from observed training counts. Adam, weight decay and validation-based early stopping control optimization.')
+        history=read_csv(P2/'member2_deep_learning_model/reports/training_history.csv')
+        if not history.empty:
+            a,b=st.columns(2)
+            with a: st.subheader('Training and validation loss'); st.line_chart(history.set_index('epoch')[['train_loss','val_loss']])
+            with b: st.subheader('Validation ranking metrics'); st.line_chart(history.set_index('epoch')[['val_macro_roc_auc','val_macro_pr_auc']])
+            st.caption('Original training history. The inference bundle loads the frozen on-disk checkpoint; its measured results are reported separately.')
+        with st.expander('Exact training configuration'): st.json(config['training'])
+    with hybrid:
+        st.subheader('Neural representation + endpoint-specific forests')
+        st.graphviz_chart('digraph {rankdir=LR; node [shape=box,style="rounded,filled",fillcolor="#edf5f5",fontname="Arial"]; "Frozen neural encoder" -> "128 learned features" -> "133 features"; "5 scaled descriptors" -> "133 features"; "133 features" -> "12 Random Forests" -> "Assay scores";}')
+        st.write('The hypothesis is that shared neural features can help a forest generalize across scaffolds. Forests use 100 trees, depth 12 and balanced class weights. Only observed training labels are used.')
+        st.info('The tested hybrid does not outperform the standalone RF or DL model. Its value is an implemented and evaluated hypothesis, not an assumed accuracy improvement.')
 
-st.title("🧪 Tox21 Molecular Toxicity Prediction Platform")
-st.markdown("### Collaborative Applied Machine Learning Engineering Project")
-st.write(
-    "An end-to-end machine learning system predicting biological and toxicological activity across "
-    "**12 nuclear receptor and stress response pathways** on 7,823 environmental chemicals."
-)
+elif page == 'Experiments & results':
+    current,historical,ablations = st.tabs(['Verified demo bundle','Historical benchmark','Ablation studies'])
+    with current:
+        st.write('These results describe the exact model bundle used for live predictions, evaluated on the frozen test partition.')
+        if not summary.empty:
+            st.dataframe(summary.round(4),use_container_width=True)
+            measure=st.selectbox('Per-endpoint metric',['roc_auc','average_precision'])
+            st.bar_chart(metrics[metrics['split'].eq('test')].pivot(index='endpoint',columns='model',values=measure))
+        with st.expander('Why these scores differ from the historical benchmark'):
+            st.write('The original embedding files did not match the saved neural checkpoint. The trainer now restores the on-disk weights, and the live hybrid was rebuilt from matching embeddings using training labels only. Historical artifacts are preserved. Software-version differences may also affect refitted RF results.')
+    with historical:
+        st.caption('Original team experiments; do not treat these as live-bundle metrics.')
+        table_file(EVAL/'results/final_model_comparison.csv')
+        plot(ROOT/'results/plots/scaffold_vs_random_split.png','Historical experiment: scaffold versus random split')
+    with ablations:
+        choice=st.selectbox('Controlled comparison',['Multitask versus single-task','Dropout','Class weighting'])
+        files={'Multitask versus single-task':'multitask_vs_single_task_summary.csv','Dropout':'dropout_ablation_summary.csv','Class weighting':'class_weight_ablation_summary.csv'}
+        table_file(EVAL/'results'/files[choice])
+        st.caption('Separate three-seed studies. Standard deviations describe variation across training seeds, not confidence intervals. Recall and F1 depend on the decision threshold.')
+        st.write('The three-seed multitask study has higher mean ROC-AUC than single-task learning. Removing class weights increases missed actives at the evaluated operating point. Removing dropout produces mixed metric changes, so no universal benefit is claimed.')
 
-# Top Team Highlights
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("📦 Curated Dataset", "7,823 Compounds", "12 Target Assays")
-c2.metric("🧬 Features", "2,053 Features", "2048 Morgan + 5 Desc")
-c3.metric("🤖 Baseline Models", "3 Architectures", "LR, DecTree, RandForest")
-c4.metric("🏆 Top Performance", "0.754 ROC-AUC", "Random Forest (Rank #1)")
+elif page == 'Predict a molecule':
+    st.write('Enter a molecular structure and compare three saved models across all 12 assays.')
+    presets={'Custom input':'','Aspirin':'CC(=O)Oc1ccccc1C(=O)O','Ethanol':'CCO','Bisphenol A':'CC(C)(c1ccc(O)cc1)c2ccc(O)cc2'}
+    selected=st.selectbox('Example molecule',list(presets))
+    smiles=st.text_input('SMILES',value=presets[selected],key='input_'+selected)
+    if st.button('Predict all 12 endpoints',type='primary'):
+        try:
+            from phase2.member5_demo_submission.predict import predict
+            with st.spinner('Running saved models…'): result=predict(smiles)
+            st.session_state['molecule_result']=result
+        except (ValueError,FileNotFoundError,ImportError,RuntimeError) as exc:
+            st.session_state.pop('molecule_result',None); st.error(str(exc))
+    result=st.session_state.get('molecule_result')
+    if result is not None:
+        canonical=result.canonical_smiles.iloc[0]
+        st.caption('Results for: '+canonical)
+        from rdkit import Chem
+        from rdkit.Chem import Draw
+        a,b=st.columns([1,3])
+        with a: st.image(Draw.MolToImage(Chem.MolFromSmiles(canonical),size=(350,250)))
+        with b:
+            scores=result.pivot(index='endpoint',columns='model',values='activity_score')
+            st.dataframe(scores.style.format('{:.3f}'),use_container_width=True)
+        st.bar_chart(scores)
+        st.download_button('Download prediction CSV',result.to_csv(index=False),'tox21_predictions.csv','text/csv')
+    st.caption('Default activity threshold: 0.5. Scores are uncalibrated assay predictions, not probabilities of human toxicity. An inactive prediction does not establish safety.')
 
-st.markdown("---")
-
-
-# ==============================================================================
-# 5 Structured Team Presentation Tabs
-# ==============================================================================
-
-tab_m1, tab_m2, tab_m3, tab_m4, tab_demo = st.tabs([
-    "🧹 Tab 1: Member 1 — Data & Scaffold Split",
-    "🧬 Tab 2: Member 2 — Features & Selection",
-    "🤖 Tab 3: Member 3 — Models & Training",
-    "📈 Tab 4: Member 4 — Evaluation & Error Analysis",
-    "🧪 Tab 5: Live Demo & Molecule Inspector",
-])
-
-artifacts = load_all_artifacts()
-
-
-# ------------------------------------------------------------------------------
-# TAB 1: MEMBER 1 — DATA CURATION, AUDITS & SCAFFOLD SPLIT
-# ------------------------------------------------------------------------------
-with tab_m1:
-    st.header("🧹 Member 1: Dataset Preprocessing, Quality Audits & Scaffold Split")
-    st.markdown("**Core Ownership:** Data hygiene, chemical sanitization, audit trail, and zero-leakage scaffold split.")
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Original Dataset Rows", "7,831", "Raw Tox21 file")
-    col2.metric("Invalid SMILES Filtered", "8 Molecules", "Explicit valence > permitted")
-    col3.metric("Valid Curated Molecules", "7,823", "Canonical SMILES")
-    col4.metric("Missing Experimental Labels", "17.05%", "Strictly masked out")
-
-    st.markdown("---")
-    st.subheader("1. Data Sanitization & Exclusion Audit")
-    st.write(
-        "8 chemical structures in the raw Tox21 library contained hypervalent aluminum atoms "
-        "(`[AlH3]` with valence 6) that failed RDKit chemical sanitization. These were documented and removed."
-    )
-    if "m1_exclusion" in artifacts:
-        excl_df = artifacts["m1_exclusion"][["mol_id", "smiles", "invalid_reason"]]
-        st.dataframe(excl_df, hide_index=True)
-
-    st.markdown("---")
-    st.subheader("2. Stereoisomer & Label Conflict Audit")
-    st.write(
-        "Member 1 identified **107 groups (229 molecules)** that are stereoisomers of each other. "
-        "Crucially, **31 groups showed contradictory biological activity** in assays. "
-        "No labels were arbitrarily changed or averaged; stereoisomers were kept intact and grouped into the same split."
-    )
-    if "m1_duplicates" in artifacts:
-        dup_df = artifacts["m1_duplicates"].head(10)
-        st.dataframe(dup_df, hide_index=True)
-
-    st.markdown("---")
-    st.subheader("3. Bemis–Murcko Scaffold Split Policy (80 / 10 / 10)")
-    st.write(
-        "To avoid train-test contamination, molecules were clustered by their Bemis–Murcko core scaffold without stereochemistry. "
-        "Molecules without rings (acyclic structures, 1,775 molecules) were partitioned into distinct groups."
-    )
-    split_summary = pd.DataFrame({
-        "Split Partition": ["Training Set", "Validation Set", "Test Set", "Total Valid"],
-        "Molecule Count": [6259, 782, 782, 7823],
-        "Percentage": ["79.99%", "10.00%", "10.01%", "100.0%"],
-        "Role in Pipeline": ["Model training", "Hyperparameter tuning", "Unbiased holdout test", "Certified handoff"],
-    })
-    st.dataframe(split_summary, hide_index=True)
-
-
-# ------------------------------------------------------------------------------
-# TAB 2: MEMBER 2 — FEATURE ENGINEERING & FEATURE SELECTION
-# ------------------------------------------------------------------------------
-with tab_m2:
-    st.header("🧬 Member 2: Feature Engineering, Standardization & Selection")
-    st.markdown("**Core Ownership:** Transforming chemical graphs into numerical feature matrices and feature selection.")
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Canonical Features", "2,053", "Combined vector")
-    col2.metric("Morgan Fingerprints", "2,048 bits", "ECFP4-like (radius=2)")
-    col3.metric("Physicochemical Descriptors", "5 Descriptors", "Scaled on train split")
-    col4.metric("Variance-Filtered Bits", "1,011 bits", "Variance >= 0.005")
-
-    st.markdown("---")
-    st.subheader("1. Canonical Feature Engineering Breakdown")
-    st.markdown("""
-    - **2,048 Binary Morgan Fingerprint Bits**: Computed using RDKit with radius=2 (equivalent to extended-connectivity fingerprints ECFP4), encoding localized atomic neighborhoods.
-    - **5 Continuous Physicochemical Descriptors**:
-      - `MolWt`: Molecular Weight (size)
-      - `TPSA`: Topological Polar Surface Area (permeability/polarity)
-      - `MolLogP`: Octanol-water partition coefficient (lipophilicity)
-      - `NumHDonors`: Number of hydrogen bond donors
-      - `NumHAcceptors`: Number of hydrogen bond acceptors
-    - **Leakage-Safe Scaling**: Standardized strictly using mean and standard deviation from the training partition.
-    """)
-
-    st.markdown("---")
-    st.subheader("2. Supervised Univariate Feature Selection (Chi2 & ANOVA F-Test)")
-    st.write(
-        "Member 2 performed univariate association tests per endpoint on observed training compounds. "
-        "Below are the top-ranked features associated with toxicity for each of the 12 endpoints:"
-    )
-    if "m2_feat_sel" in artifacts:
-        st.dataframe(artifacts["m2_feat_sel"].rename(columns={
-            "endpoint": "Endpoint",
-            "train_observed_n": "Train Observed (N)",
-            "train_positives": "Train Actives",
-            "top_1_associated_feature": "Top 1 Feature",
-            "top_1_association_score": "Score",
-            "top_5_associated_features": "Top 5 Associated Features",
-        }), hide_index=True)
-
-    st.info("""
-    **Cheminformatics Insight:**
-    - For `SR-MMP` (Mitochondrial Disruption), continuous descriptor `MolLogP` ranks among the top features because lipophilicity drives membrane permeability.
-    - For `SR-ARE` (Antioxidant response), `MolWt` is the #1 associated feature.
-    - For `NR-AR` and `NR-AR-LBD` (Androgen Receptors), bit `morgan_519` is the #1 predictor with an association score >1,500.
-    """)
-
-
-# ------------------------------------------------------------------------------
-# TAB 3: MEMBER 3 — MODEL ARCHITECTURES & BASELINE TRAINING
-# ------------------------------------------------------------------------------
-with tab_m3:
-    st.header("🤖 Member 3: Baseline Classifiers & Model Training")
-    st.markdown("**Core Ownership:** Classical model training, class imbalance weighting, and baseline validation.")
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Class Imbalance Ratio", "5x to 34x", "Negative:Positive ratio")
-    col2.metric("Weighting Strategy", "class_weight='balanced'", "Adjusts for rare actives")
-    col3.metric("Endpoints Fitted", "12 Assays", "Independent binary classifiers")
-
-    st.markdown("---")
-    st.subheader("1. Evaluated Baseline Architectures & Hyperparameters")
-    
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
-        st.markdown("""
-        **1. Logistic Regression**
-        - Fast, linear decision boundary
-        - `max_iter`: 1,000
-        - `class_weight`: `'balanced'`
-        - `solver`: L-BFGS
-        - Purpose: Linear baseline
-        """)
-    with col_b:
-        st.markdown("""
-        **2. Decision Tree**
-        - Non-linear decision rules
-        - `max_depth`: 10
-        - `class_weight`: `'balanced'`
-        - `criterion`: Gini impurity
-        - Purpose: Single-tree baseline
-        """)
-    with col_c:
-        st.markdown("""
-        **3. Random Forest**
-        - 100 decorrelated trees
-        - `n_estimators`: 100
-        - `max_depth`: 12
-        - `class_weight`: `'balanced'`
-        - Purpose: Non-linear ensemble
-        """)
-
-    st.markdown("---")
-    st.subheader("2. Member 3 Initial Benchmark Results (Validation vs. Test)")
-    st.write("Validation set (used for tuning) vs. Test set baseline scores across models:")
-    if "m3_results" in artifacts:
-        m3_df = artifacts["m3_results"]
-        st.dataframe(m3_df[["endpoint", "model", "train_total_samples", "val_roc_auc", "val_pr_auc", "test_roc_auc", "test_pr_auc"]].rename(columns={
-            "endpoint": "Endpoint",
-            "model": "Model",
-            "train_total_samples": "Train N",
-            "val_roc_auc": "Val ROC-AUC",
-            "val_pr_auc": "Val PR-AUC",
-            "test_roc_auc": "Test ROC-AUC",
-            "test_pr_auc": "Test PR-AUC",
-        }), hide_index=True)
-
-
-# ------------------------------------------------------------------------------
-# TAB 4: MEMBER 4 — EVALUATION, STATISTICS & ERROR ANALYSIS (YOUR ROLE)
-# ------------------------------------------------------------------------------
-with tab_m4:
-    st.header("📈 Member 4: Evaluation, Statistics, Error Analysis & Task 6")
-    st.markdown("**Core Ownership:** Proving whether models truly generalize, statistical hypothesis tests, and failure mode diagnosis.")
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Top Model", "Random Forest", "0.754 ROC / 0.396 PR")
-    col2.metric("Bootstrap Resamples", "1,000 / Endpoint", "95% Confidence Intervals")
-    col3.metric("Paired Comparisons", "Exact Same Compounds", "Controlled p-values")
-    col4.metric("Generalization Penalty", "-0.0840 ROC-AUC", "Scaffold vs. Random Split")
-
-    st.markdown("---")
-    st.subheader("1. Macro-Averaged Benchmark Summary (All 12 Assays)")
-    macro_table = pd.DataFrame({
-        "Model": ["Random Forest", "Logistic Regression", "Decision Tree"],
-        "Test ROC-AUC (Mean ± Std)": ["0.7541 ± 0.0570", "0.7152 ± 0.0596", "0.6428 ± 0.0597"],
-        "Test PR-AUC (Mean ± Std)": ["0.3962 ± 0.1323", "0.2949 ± 0.1319", "0.2091 ± 0.0957"],
-        "F1-Score": [0.3969, 0.3268, 0.2629],
-        "Balanced Accuracy": [0.6684, 0.6358, 0.6295],
-        "Matthews Correlation (MCC)": [0.3141, 0.2413, 0.1616],
-    })
-    st.dataframe(macro_table, hide_index=True)
-
-    plot_path1 = PLOTS_DIR / "model_comparison_roc_pr_auc.png"
-    if plot_path1.exists():
-        st.image(str(plot_path1), caption="Model Comparison across all 12 endpoints with 95% Bootstrap error bars", width=950)
-
-    st.markdown("---")
-    st.subheader("2. Task 6 Discovery: Scaffold Split vs. Random Split Benchmark")
-    st.write(
-        "We compared the realistic **Bemis-Murcko Scaffold Split** against an 80/10/10 **Random Split** "
-        "to quantify how much random splitting artificially exaggerates model performance."
-    )
-    col_sc1, col_sc2 = st.columns([1.2, 1])
-    with col_sc1:
-        plot_path2 = PLOTS_DIR / "scaffold_vs_random_split.png"
-        if plot_path2.exists():
-            st.image(str(plot_path2), caption="Scaffold Split vs. Random Split Comparison", width=620)
-    with col_sc2:
-        if "m4_split" in artifacts and "m4_metrics" in artifacts:
-            rf_scaff = artifacts["m4_metrics"][artifacts["m4_metrics"]["model"] == "Random Forest"][["endpoint", "test_roc_auc"]]
-            rf_rand = artifacts["m4_split"][artifacts["m4_split"]["model"] == "Random Forest"][["endpoint", "random_test_roc_auc"]]
-            merged_sp = pd.merge(rf_scaff, rf_rand, on="endpoint")
-            merged_sp["Inflation (ΔROC)"] = (merged_sp["random_test_roc_auc"] - merged_sp["test_roc_auc"]).round(4)
-            st.dataframe(merged_sp.rename(columns={
-                "endpoint": "Endpoint",
-                "test_roc_auc": "Scaffold ROC",
-                "random_test_roc_auc": "Random ROC",
-            }), hide_index=True)
-
-    st.markdown("---")
-    st.subheader("3. Failure Mode Diagnostics (Error Analysis)")
-    st.info("""
-    - **Why `NR-ER` struggled (0.634 ROC-AUC):** Estrogen Receptor binders belong to distinct chemical families (steroidal vs. bisphenols). Scaffold clustering separated these families into different splits, meaning the test set contained core scaffolds unseen during training.
-    - **Why `SR-ATAD5` (0.137 PR-AUC) & `NR-PPAR-gamma` struggled:** Suffered from extreme class imbalance (<5% actives), generating high false positive rates and low precision.
-    - **Why `SR-MMP` succeeded (0.827 ROC-AUC):** Mitochondrial membrane disruption is strongly driven by lipophilicity (`MolLogP`) and delocalized positive charge, which the 5 descriptors and Morgan bits captured easily.
-    """)
-
-
-# ------------------------------------------------------------------------------
-# TAB 5: INTERACTIVE LIVE DEMO & MOLECULE INSPECTOR
-# ------------------------------------------------------------------------------
-with tab_demo:
-    st.header("🧪 Interactive Demo: Molecule Inspector & Live Toxicity Predictor")
-
-    subtab1, subtab2 = st.tabs(["🔍 Molecule Error Inspector (Test Set)", "⚡ Live SMILES Predictor"])
-
-    # Subtab 1: Inspect evaluated test compounds
-    with subtab1:
-        st.subheader("Inspect Test Compound Failures & Successes")
-        if "m4_preds" in artifacts:
-            df_preds = artifacts["m4_preds"]
-            c_ep, c_filt = st.columns(2)
-            with c_ep:
-                sel_ep = st.selectbox("Select Endpoint:", ["NR-ER", "SR-MMP", "NR-AhR", "SR-ATAD5", "NR-PPAR-gamma"])
-            with c_filt:
-                sel_cat = st.selectbox(
-                    "Filter Category:",
-                    ["False Negatives (Toxic Actives Missed by RF)", "False Positives (Inactives Flagged Toxic)", "True Positives (Accurately Flagged Toxic)"]
-                )
-
-            sub_m = df_preds[df_preds["endpoint"] == sel_ep]
-            if "False Negatives" in sel_cat:
-                filtered_m = sub_m[(sub_m["y_true"] == 1) & (sub_m["pred_rf"] == 0)]
-            elif "False Positives" in sel_cat:
-                filtered_m = sub_m[(sub_m["y_true"] == 0) & (sub_m["pred_rf"] == 1)]
-            else:
-                filtered_m = sub_m[(sub_m["y_true"] == 1) & (sub_m["pred_rf"] == 1)]
-
-            st.write(f"Found **{len(filtered_m)}** molecules matching filter.")
-
-            if not filtered_m.empty:
-                pick_id = st.selectbox("Choose Molecule:", filtered_m["mol_id"].tolist())
-                pick_row = filtered_m[filtered_m["mol_id"] == pick_id].iloc[0]
-
-                col_d1, col_d2 = st.columns([1, 1.2])
-                with col_d1:
-                    st.markdown("#### 🧪 2D Molecular Structure")
-                    img = render_mol_image(pick_row["smiles"], size=(340, 220))
-                    if img:
-                        st.image(img, caption=f"ID: {pick_row['mol_id']}")
-                    else:
-                        st.write("2D structure rendering available with RDKit.")
-                with col_d2:
-                    st.markdown("#### 🔬 Diagnostic Details")
-                    st.write(f"**Molecule ID:** `{pick_row['mol_id']}`")
-                    st.write(f"**True Experimental Label:** `{'1 (Toxic / Active)' if pick_row['y_true'] == 1 else '0 (Non-Toxic / Inactive)'}`")
-                    st.write(f"**Random Forest Probability:** `{pick_row['prob_rf']:.2%}`")
-                    st.write(f"**Logistic Regression Probability:** `{pick_row['prob_lr']:.2%}`")
-                    st.write(f"**Decision Tree Probability:** `{pick_row['prob_dt']:.2%}`")
-                    st.write(f"**SMILES:** `{pick_row['smiles']}`")
-                    st.write(f"**Scaffold:** `{pick_row['scaffold_smiles']}`")
-
-    # Subtab 2: Live SMILES Predictor
-    with subtab2:
-        st.subheader("⚡ Real-Time Live Molecule Predictor")
-        st.write("Enter a chemical SMILES string to view its structure and predict toxicity across endpoints:")
-
-        presets = {
-            "Aspirin (Common analgesic)": "CC(=O)Oc1ccccc1C(=O)O",
-            "Estradiol (Estrogen Receptor agonist)": "CC12CCC3C(C1CCC2O)CCC4=C3C=CC(=C4)O",
-            "Tamoxifen (Selective Estrogen Receptor Modulator)": "CCC(=C(c1ccccc1)c2ccc(OCCN(C)C)cc2)c3ccccc3",
-            "Bisphenol A (Endocrine disruptor)": "CC(C)(c1ccc(O)cc1)c2ccc(O)cc2",
-        }
-        pick_preset = st.selectbox("Choose a preset molecule:", ["Custom Input"] + list(presets.keys()))
-        input_smi = presets[pick_preset] if pick_preset != "Custom Input" else "CC(=O)Oc1ccccc1C(=O)O"
-        smi_text = st.text_input("SMILES Chemical String:", value=input_smi)
-
-        col_p1, col_p2 = st.columns([1, 1.3])
-        with col_p1:
-            st.markdown("#### 🧪 2D Chemical Structure")
-            live_img = render_mol_image(smi_text, size=(340, 220))
-            if live_img:
-                st.image(live_img, caption="Predicted Molecule Structure")
-            else:
-                st.warning("Enter a valid SMILES string to render.")
-
-        with col_p2:
-            st.markdown("#### 📊 Key Molecular Descriptors")
-            if RDKIT_AVAILABLE:
-                mol_obj = Chem.MolFromSmiles(smi_text)
-                if mol_obj:
-                    st.write(f"- **Molecular Weight**: `{Descriptors.MolWt(mol_obj):.2f}` g/mol")
-                    st.write(f"- **LogP (Lipophilicity)**: `{Descriptors.MolLogP(mol_obj):.2f}`")
-                    st.write(f"- **TPSA**: `{Descriptors.TPSA(mol_obj):.2f}` Å²")
-                    st.write(f"- **H-Bond Donors**: `{Lipinski.NumHDonors(mol_obj)}`")
-                    st.write(f"- **H-Bond Acceptors**: `{Lipinski.NumHAcceptors(mol_obj)}`")
-                    st.success("Valid chemical structure verified by RDKit.")
-                else:
-                    st.error("Invalid SMILES string.")
+else:
+    st.write('Explore the full methodology, evidence, limitations and reproduction instructions.')
+    for label,path,mime in [('Formal report — LaTeX source',DEMO/'report/main.tex','text/plain'),('Project presentation',DEMO/'presentation/phase2_presentation_professional.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation'),('Setup and reproduction guide',DEMO/'README.md','text/markdown')]:
+        if path.exists(): st.download_button(label,path.read_bytes(),path.name,mime)
+    st.markdown('**Reproduce locally**')
+    st.code('python -m pip install -r requirements.txt\npython -m phase2.member5_demo_submission.prepare_models\nstreamlit run app.py',language='bash')
+    st.caption('Model hashes and library versions are recorded with the inference bundle. No model training occurs during a prediction.')
