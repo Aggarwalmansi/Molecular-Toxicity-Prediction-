@@ -1,8 +1,21 @@
-# Phase 2 — Member 3: ML + DL Hybrid Model
+# Feature-Level Hybrid: Random Forest on Learned Embeddings
 
-**Role:** Hybrid modelling — Random Forest on learned Deep Learning features
-**Status:** Complete, with a negative result that is reported honestly
-**Headline finding:** On this dataset the hybrid **does not improve** on either standalone model.
+> Kept from the original `phase2/hybrid/README.md`, which was merged into the single root README.
+> Only directory listings and per-member handoff snippets were dropped; all analysis is intact.
+
+---
+
+> **Important correction, added after this analysis was written.**
+> The standalone deep learning figure quoted below (0.7179 test ROC-AUC) came
+> from a checkpoint affected by a `state_dict` aliasing bug: the restored model
+> was the final training epoch, not the best one. The correctly restored
+> checkpoint scores **0.7318**, and the hybrid rebuilt on correct embeddings
+> plus ExtraTrees reaches **0.7294** instead of 0.6785.
+>
+> **The conclusion below is unchanged** — the feature-level hybrid still loses
+> to the standalone Random Forest (0.7541), and the reasoning in "Why the
+> hybrid loses" still holds. The corrected numbers are in
+> `phase2/experiments/PART_A_RESULTS.md`, sections 2 and 3.
 
 ---
 
@@ -23,7 +36,7 @@ Member 2's trained network (frozen)              5 molecular descriptors
                      12 toxicity probabilities
 ```
 
-Diagram: `reports/plots/hybrid_architecture.png`
+Diagram: `phase2/results/plots/hybrid_architecture.png`
 
 The learned features are the **128-dimensional bottleneck embedding** from
 `MultiTaskToxicNet.latent_layer`, the layer just before Member 2's 12-output
@@ -54,9 +67,9 @@ Per endpoint, the hybrid beats the standalone Random Forest on ROC-AUC in only
 **1 of 12** cases (SR-ARE, +0.0082). Its single clear win is NR-AR-LBD against
 the deep model (+0.0616).
 
-Full tables: `reports/comparison_roc_auc.csv`, `comparison_pr_auc.csv`,
-`comparison_f1_score.csv`, `comparison_mcc.csv`.
-Chart: `reports/plots/model_comparison.png`.
+Full tables: `phase2/results/metrics/hybrid_comparison_roc_auc.csv`, `hybrid_comparison_pr_auc.csv`,
+`hybrid_comparison_f1_score.csv`, `hybrid_comparison_mcc.csv`.
+Chart: `phase2/results/plots/hybrid_model_comparison.png`.
 
 ### Is this just bad Random Forest settings?
 
@@ -162,96 +175,4 @@ learned features, and it is worth mentioning if asked.
 
 ---
 
-## 6. Files
 
-```
-phase2/member3_hybrid_model/
-├── README.md                          # this file
-├── requirements.txt
-├── train_hybrid.py                    # entry point, runs the whole pipeline
-├── configs/
-│   └── hybrid_config.json             # feature sources + forest settings
-├── src/
-│   ├── hybrid_features.py             # builds the 133-feature matrix
-│   ├── hybrid_model.py                # trains / saves / loads the 12 forests
-│   ├── evaluate_hybrid.py             # metrics + three-way comparison
-│   ├── check_rf_settings.py           # validation-only settings check
-│   └── make_diagram.py                # architecture + comparison plots
-├── models/                            # 12 saved forests, rf_<endpoint>.joblib
-└── reports/
-    ├── test_evaluation.csv            # hybrid per-endpoint test metrics
-    ├── validation_evaluation.csv      # hybrid per-endpoint validation metrics
-    ├── test_predictions.csv           # 9384 rows: 782 molecules x 12 endpoints
-    ├── rf_settings_check.csv
-    ├── comparison_roc_auc.csv         # (also pr_auc, f1_score, mcc)
-    └── plots/
-        ├── hybrid_architecture.png
-        └── model_comparison.png
-```
-
-### What each main file does
-
-- **`hybrid_features.py`** — reads Member 2's saved embeddings and Member 1's
-  scaled descriptors, checks the molecule order matches, and joins them into
-  133 columns. The `use_descriptors=False` switch is what produced the
-  descriptor ablation in section 2.
-- **`hybrid_model.py`** — `select_observed_rows()` applies the missing-label
-  mask; `train_all_endpoints()` fits the 12 forests; `save_forests()` writes
-  them to `models/`. The forest settings are deliberately identical to the
-  Phase 1 baseline so the comparison isolates the features.
-- **`evaluate_hybrid.py`** — `evaluate_predictions()` computes per-endpoint
-  metrics on observed labels only; `build_comparison()` joins our results with
-  the result files the other two members already produced.
-- **`check_rf_settings.py`** — the validation-only evidence that the result is
-  not a hyperparameter artifact.
-
----
-
-## 7. How to run
-
-From the repository root:
-
-```bash
-python -m phase2.member3_hybrid_model.train_hybrid
-```
-
-Then, optionally:
-
-```bash
-python -m phase2.member3_hybrid_model.src.check_rf_settings
-```
-
-```bash
-python -m phase2.member3_hybrid_model.src.make_diagram
-```
-
-Reusing the saved forests without retraining:
-
-```python
-from phase2.member3_hybrid_model.src import load_forests, predict_probabilities
-forests = load_forests()
-probabilities = predict_probabilities(forests, test_features)
-```
-
-**Version note.** `requirements.txt` pins `scikit-learn==1.9.1` because the 12
-files in `models/` were pickled with that version, and scikit-learn does not
-guarantee that a model saved by one version loads correctly in another. If you
-are on a different version, either install the pinned one or just retrain —
-`train_hybrid.py` rebuilds all 12 forests in about 2 seconds and overwrites
-`models/` with files matching your own version.
-
----
-
-## 8. Note for the team
-
-While reading the Phase 1 outputs I found that `results/metrics.csv` and
-`model_evaluation_results.csv` disagree on the Random Forest test scores — for
-NR-AR they give 0.7387 and 0.6922 ROC-AUC respectively, and the macro averages
-are 0.7541 and 0.7498. They appear to come from two different Phase 1 runs.
-
-This module uses `results/metrics.csv` for test comparisons, because that is the
-file containing the full metric set (F1, MCC, balanced accuracy), and
-`model_evaluation_results.csv` only for validation scores, which are the only
-place validation numbers were saved. The conclusion is unaffected: the hybrid
-scores below the standalone forest under either file. Someone should confirm
-which Phase 1 run is authoritative before the final report.

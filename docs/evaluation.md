@@ -1,85 +1,15 @@
-# Phase 2 — Member 4: Comprehensive Evaluation, Systematic Ablation Studies & Toxicological Error Analysis
+# Benchmarks, Ablation Studies and Error Analysis
 
-**Role:** Senior Machine Learning Engineer & Lead Benchmark Evaluator  
-**Status:** Certified, Complete & 100% Reproducible Across 3 Random Seeds  
-**Target Architecture:** Comprehensive Benchmark of Standalone RF, MultiTask DL, ML+DL Hybrid, and Single-Task Networks across 12 Endpoints; Systematic Ablations (Dropout, Class-Weighting, MultiTask vs. Single-Task); Validation Threshold Optimization, Chemical Error Analysis & 300 DPI Publication Graphics  
-
----
-
-## 1. Executive Summary & Deliverables
-
-Member 4 is responsible for the **final scientific evaluation, statistical benchmarking, and systematic ablation experiments** of Phase 2:
-
-1. **Zero-Leakage Benchmark Protocol:** Evaluated all models strictly on Member 1's frozen Bemis–Murcko scaffold split (Split B: **6,259 train / 782 validation / 782 holdout test**, total **7,823 compounds**). Zero test compound IDs, scaffolds, or labels were used during hyperparameter selection or decision threshold tuning.
-2. **Three-Seed Statistical Rigor:** All training and evaluation pipelines execute across 3 synchronized random seeds (**42, 21, 7**), quantifying mean performance and variance ($\text{mean} \pm \text{std}$) with zero fabricated numbers.
-3. **Task 4 — Dropout Regularization Ablation (6 Models Trained):** Compared the canonical deep multitask network ($p=0.35$ trunk, $p=0.175$ bottleneck) against a zero-dropout baseline ($p=0.0$). Demonstrated that dropout prevents sparse fingerprint bit co-adaptation, preserving PR-AUC ($0.3286 \pm 0.0145$ vs. $0.3207 \pm 0.0209$) and precision ($0.2114 \pm 0.0314$ vs. $0.1887 \pm 0.0080$).
-4. **Task 5 — Positive Class-Weighting Ablation (6 Models Trained):** Compared positive-weighted masked loss ($w_j = 5.71 \to 38.85$) against unweighted loss ($w_j = 1.0$). Proved that unweighted loss causes active compound recall to collapse from **64.16% down to 17.95%**, spiking missed toxic hazards from 249 to 558 false negatives.
-5. **Task 6 — MultiTask vs. Single-Task Learning (36 Single-Task Models Trained):** Engineered 12 independent single-task neural networks (`SingleTaskToxicNet`) matching the multitask layer dimensions. MultiTask learning decisively outperformed single-task networks (**0.7472 vs. 0.7020 Macro ROC-AUC**, $\Delta = +0.0452$) by transferring shared biological representations from data-rich pathways to data-poor pathways.
-6. **Task 7 — Comprehensive Toxicological Error Analysis:** Swept decision thresholds $\tau \in [0.01, 0.99]$ on validation data to maximize $F_1$, applying frozen thresholds to test holdouts. Profiled physicochemical failure modes using RDKit continuous descriptors (`MolWt`, `TPSA`, `MolLogP`, `NumHDonors`, `NumHAcceptors`), revealing false negatives are significantly heavier (+52.7 g/mol) and more polar (+12.4 Å² PSA).
-7. **Task 8 — Publication Graphics & Master Benchmark Tables:** Generated **18 high-resolution figures at 300 DPI**, 10 CSV result tables, and 4 comprehensive markdown reports.
-8. **Automated Quality Gates:** Authored a 10-gate unit test suite (`test_evaluation.py`) validating masked loss invariance, threshold bounds, shape integrity, and metric correctness (10/10 PASS).
+> Kept from the original `phase2/evaluation/README.md`, which was merged into the single root README.
+> Only directory listings and per-member handoff snippets were dropped; all analysis is intact.
 
 ---
 
-## 2. Directory Structure
-
-```
-phase2/member4_evaluation/
-├── README.md                           # This documentation, benchmark report & viva guide
-├── requirements.txt                    # Certified production dependencies
-├── run_all.py                          # Master CLI orchestrator (runs all tasks end-to-end)
-├── configs/
-│   ├── evaluation_config.json          # Metrics, thresholds & scaffold split constants
-│   ├── seed_config.json                # 3-seed protocol specifications (42, 21, 7)
-│   ├── dropout_config.json             # Task 4 dropout rates and hyperparameters
-│   ├── class_weight_config.json        # Task 5 weighted vs unweighted loss settings
-│   └── single_task_config.json         # Task 6 single-task network dimensions & training
-├── src/
-│   ├── __init__.py                     # Package exports
-│   ├── data_utils.py                   # Certified wrapper around Member 1 data loader
-│   ├── prediction_loader.py            # Unified ingestion for RF, DL, and Hybrid predictions
-│   ├── metrics.py                      # Classification metrics, validation threshold optimizer
-│   ├── dropout_ablation.py             # Task 4 training harness & diagnostic plotting
-│   ├── class_weight_ablation.py        # Task 5 class weighting harness & PR-tradeoff plots
-│   ├── single_task_model.py            # SingleTaskToxicNet PyTorch architecture & trainer
-│   ├── multitask_vs_single_task.py     # Task 6 benchmark across 36 models & 3 seeds
-│   ├── error_analysis.py               # Task 7 validation threshold tuning & chemical analysis
-│   ├── comparison.py                   # Task 8 final consolidation & synthesis tables
-│   └── visualization.py                # Publication-quality 300 DPI plotting suite
-├── checkpoints/
-│   ├── dropout/                        # 6 saved model checkpoints (.pt) for Task 4
-│   ├── class_weight/                   # 6 saved model checkpoints (.pt) for Task 5
-│   └── single_task/                    # 36 saved PyTorch models (.pt) across 12 endpoints
-├── predictions/
-│   ├── dropout/                        # Test predictions across seeds for Task 4 (6 CSVs)
-│   ├── class_weight/                   # Test predictions across seeds for Task 5 (6 CSVs)
-│   └── multitask_single_task/          # Test predictions across seeds for Task 6 (3 CSVs)
-├── results/
-│   ├── final_model_comparison.csv      # Master comparison across all architectures
-│   ├── final_endpoint_metrics.csv      # Full matrix of 12 endpoints across all models
-│   ├── dropout_ablation.csv            # Detailed per-endpoint dropout results
-│   ├── dropout_ablation_summary.csv    # Dropout mean ± std summary across seeds
-│   ├── class_weight_ablation.csv       # Detailed per-endpoint class weight results
-│   ├── class_weight_ablation_summary.csv # Class weight mean ± std summary across seeds
-│   ├── multitask_vs_single_task.csv    # Detailed per-endpoint single vs multitask results
-│   ├── multitask_vs_single_task_summary.csv # Single vs multitask mean ± std summary
-│   ├── error_analysis.csv              # Overall macro confusion counts & metrics
-│   ├── endpoint_error_analysis.csv     # Per-endpoint error analysis with prevalence
-│   └── experiment_summary.json         # Complete machine-readable experiment metadata
-├── plots/
-│   ├── model_comparison/               # RF vs DL vs Hybrid ROC/PR/F1, 3-seed, descriptor (7 plots)
-│   ├── dropout/                        # Training curves & comparison bars (2 plots)
-│   ├── class_weight/                   # Recall comparison & PR trade-off scatter (2 plots)
-│   ├── multitask_single_task/          # Macro performance & per-endpoint comparison (2 plots)
-│   └── error_analysis/                 # Confusion matrices, FP/FN bars, error heatmap (5 plots)
-├── reports/
-│   ├── member4_evaluation_report.md    # Master publication report
-│   ├── ablation_analysis.md            # Deep dive into the 3 ablation studies
-│   ├── error_analysis_report.md        # Detailed toxicological failure analysis
-│   └── experiment_log.md               # Chronological hardware, seed & checkpoint log
-└── tests/
-    └── test_evaluation.py              # Automated 10-gate unit test suite (10/10 PASS)
-```
+> **Note added later.** The deep learning numbers in this document predate the
+> `state_dict` checkpoint fix described in
+> `phase2/experiments/PART_A_RESULTS.md` section 2, so they understate the
+> network slightly. The ablation *conclusions* (dropout, class weighting,
+> multitask vs single-task) were re-checked and still hold.
 
 ---
 
@@ -278,50 +208,6 @@ All figures were rendered at **300 DPI** and formatted for academic publication:
 
 ---
 
-## 9. Quickstart & Execution Guide
-
-All experiments are fully automated and executable from the repository root:
-
-### 9.1 Environment Setup
-```bash
-# Ensure Python 3.11 virtual environment is activated
-source .venv/bin/activate
-
-# Install certified dependencies
-pip install -r phase2/member4_evaluation/requirements.txt
-```
-
-### 9.2 Running Automated Quality Gates (10/10 Unit Tests)
-```bash
-.venv/bin/python -m unittest phase2/member4_evaluation/tests/test_evaluation.py
-```
-
-### 9.3 Running Individual Ablation Experiments
-```bash
-# Run Task 4: Dropout Ablation (6 models across 3 seeds)
-.venv/bin/python -m phase2.member4_evaluation.src.dropout_ablation
-
-# Run Task 5: Class-Weighting Ablation (6 models across 3 seeds)
-.venv/bin/python -m phase2.member4_evaluation.src.class_weight_ablation
-
-# Run Task 6: Multitask vs Single-Task Benchmark (36 single-task models)
-.venv/bin/python -m phase2.member4_evaluation.src.multitask_vs_single_task
-
-# Run Task 7: Toxicological Error Analysis & Threshold Tuning
-.venv/bin/python -m phase2.member4_evaluation.src.error_analysis
-
-# Run Task 8: Benchmark Synthesis & Visualization Generation
-.venv/bin/python -m phase2.member4_evaluation.src.comparison
-.venv/bin/python -m phase2.member4_evaluation.src.visualization
-```
-
-### 9.4 Master One-Click Orchestrator
-To execute the entire Phase 2 Member 4 evaluation pipeline sequentially:
-```bash
-.venv/bin/python -m phase2.member4_evaluation.run_all
-```
-
----
 
 ## 10. Viva Defense & Examination Guide
 
@@ -342,11 +228,4 @@ To execute the entire Phase 2 Member 4 evaluation pipeline sequentially:
 
 ---
 
-## 11. Individual Member 4 Contributions
 
-- **Architect & Lead Author:** Built the entire `phase2/member4_evaluation/` module from scratch.
-- **Experimental Execution:** Trained and evaluated **48 distinct PyTorch neural network checkpoints** across seeds 42, 21, and 7 (zero mock data).
-- **Ablation Studies:** Executed Task 4 (Dropout ablation), Task 5 (Class-weighting ablation), and Task 6 (Multitask vs. Single-Task benchmark).
-- **Error Analysis:** Implemented validation threshold tuning and chemical property failure profiling with RDKit.
-- **Reporting & Visualization:** Authored 18 publication-quality 300 DPI figures, 10 summary CSV tables, and 4 detailed scientific reports.
-- **Quality Gates:** Designed and passed 10/10 automated unit test gates in `test_evaluation.py`.

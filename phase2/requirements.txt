@@ -1,0 +1,20 @@
+# Phase 2 dependencies — one file for the whole of phase2/.
+# Merged from the four per-module requirements files. Where two modules asked
+# for different minimum versions, the higher one is kept.
+#
+# Phase 1 has its own requirements.txt at the repository root. Do not edit it.
+
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+pyarrow>=8.0.0
+
+# Pinned exactly: the saved .joblib hybrid models were written by this version,
+# and joblib does not guarantee they load under a different one.
+scikit-learn==1.9.1
+joblib>=1.3.0
+
+torch>=2.0.0
+
+matplotlib>=3.7.0
+seaborn>=0.12.0

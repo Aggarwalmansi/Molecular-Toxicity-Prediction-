@@ -1,41 +1,7 @@
-# Phase 2 — Member 1: Data Pipeline & Literature
+# Data Pipeline, Split Contract and Label Masking
 
-**Role:** ML Infrastructure & Cheminformatics Data Engineer
-**Status:** Certified & Frozen Ground Truth
-**Target Architecture:** Multi-Task Deep Learning & Hybrid ML Modeling across 12 Tox21 Endpoints
-
----
-
-## 1. Executive Summary & Module Responsibility
-
-Member 1 owns the **foundation and ground truth** for all Phase 2 modeling and evaluation:
-1. **Frozen Dataset & Split Contract:** Freezes the single authoritative Bemis–Murcko scaffold split (Split B: **6,259 train / 782 validation / 782 test**, total **7,823 compounds**).
-2. **Feature Handoff Contract:** Connects precomputed Phase 1 feature matrices (`X_combined`, `X_morgan_unsupervised_filtered`, `X_descriptors_scaled`) without re-computation or data leakage.
-3. **Labels & Observation Masks:** Preserves experimental missing labels strictly as IEEE 754 `NaN` and provides explicit boolean observation masks for all 12 endpoints.
-4. **Class Imbalance & Positive Weights:** Formulates exact positive class weighting tensors strictly from observed training molecules.
-5. **Literature Foundation:** Curates 4 peer-reviewed, verified landmark papers justifying the multi-task, scaffold-split, and curation methodology.
-
----
-
-## 2. Directory Structure
-
-```
-phase2/member1_data_pipeline/
-├── README.md                           # This documentation and data contract
-├── requirements.txt                    # Minimal production dependencies
-├── configs/
-│   └── split_config.json               # Frozen split metadata, counts, checksums & weights
-├── reports/
-│   ├── class_imbalance.csv             # Per-endpoint statistics across train, val, test, overall
-│   └── validation_summary.json         # Automated verification results (48/48 invariants pass)
-├── literature/
-│   └── literature_table.csv            # 4 verified scientific publications with active DOIs
-├── src/
-│   ├── __init__.py                     # Package exports
-│   └── data_loader.py                  # High-level loader & PyTorch dataset/dataloader generator
-└── tests/
-    └── test_data_pipeline.py           # Automated test suite (10/10 quality gates pass)
-```
+> Kept from the original `phase2/data/README.md`, which was merged into the single root README.
+> Only directory listings and per-member handoff snippets were dropped; all analysis is intact.
 
 ---
 
@@ -115,90 +81,13 @@ Weights are calculated strictly from training partition observed labels:
 
 ---
 
-## 6. Downstream Member Quickstart & API Guide
-
-### 6.1 Installation
-```bash
-pip install -r phase2/member1_data_pipeline/requirements.txt
-```
-
-### 6.2 For Member 2: Deep Learning Model
-```python
-from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
-
-loader = Tox21DataLoader()
-
-# 1. Option A: Native PyTorch DataLoaders (batch_size=64)
-# Returns (X, y, mask) tensors where mask indicates valid observed targets
-train_loader, val_loader, test_loader = loader.get_pytorch_dataloaders(
-    feature_set="combined",  # 2,053 features (Morgan + scaled descriptors)
-    batch_size=64,
-    shuffle_train=True
-)
-
-# 2. Get positive class weight tensor for BCEWithLogitsLoss
-pos_weights = loader.get_class_weights(as_tensor=True)  # torch.FloatTensor of shape (12,)
-
-# 3. Training Loop Step Example:
-# for X_batch, y_batch, mask_batch in train_loader:
-#     logits = model(X_batch)
-#     loss = (F.binary_cross_entropy_with_logits(
-#         logits, y_batch, pos_weight=pos_weights, reduction="none"
-#     ) * mask_batch).sum() / mask_batch.sum()
-```
-
-### 6.3 For Member 3: ML + DL Hybrid Model
-```python
-from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
-import numpy as np
-
-loader = Tox21DataLoader()
-
-# 1. Load scaled 5 continuous descriptors (fitted strictly on train)
-X_desc_train, _ = loader.load_features("descriptors_scaled", split="train") # (6259, 5)
-X_desc_test, _  = loader.load_features("descriptors_scaled", split="test")  # (782, 5)
-
-# 2. Assume Member 2 provides learned latent embeddings: z_train (6259, D_latent), z_test (782, D_latent)
-# X_hybrid_train = np.hstack([z_train, X_desc_train])
-# X_hybrid_test  = np.hstack([z_test, X_desc_test])
-
-# 3. Train one Random Forest per endpoint using observed masks:
-for ep_idx, ep in enumerate(loader.TARGET_ASSAYS):
-    y_tr, mask_tr, _ = loader.load_labels(split="train", endpoints=[ep])
-    obs = mask_tr[:, 0]  # boolean filter
-    # rf.fit(X_hybrid_train[obs], y_tr[obs, 0])
-```
-
-### 6.4 For Member 4: Rigorous Evaluation & Ablation Studies
-```python
-from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
-
-loader = Tox21DataLoader()
-
-# Load exact holdout test data
-X_test, test_mids = loader.load_features("combined", split="test")
-y_test, mask_test, test_mids_y = loader.load_labels(split="test")
-assert test_mids == test_mids_y  # Guaranteed row-for-row alignment
-
-# Evaluate each model on identical test instances:
-# for ep_idx, ep in enumerate(loader.TARGET_ASSAYS):
-#     obs = mask_test[:, ep_idx]
-#     y_true = y_test[obs, ep_idx]
-#     roc = roc_auc_score(y_true, y_pred_prob[obs])
-```
-
-### 6.5 For Member 5: Streamlit App & Presentation Report
-- Load `phase2/member1_data_pipeline/reports/class_imbalance.csv` directly for interactive data distribution charts in Streamlit.
-- Reference `phase2/member1_data_pipeline/literature/literature_table.csv` for the IEEE report literature section.
-
----
 
 ## 7. Quality Gates & Test Suite Verification
 
 Run the automated verification suite:
 
 ```bash
-python3 -m unittest phase2/member1_data_pipeline/tests/test_data_pipeline.py
+python3 -m unittest phase2/data/tests/test_data_pipeline.py
 ```
 
 ### Automated Quality Gates Result:
@@ -221,3 +110,4 @@ python3 -m unittest phase2/member1_data_pipeline/tests/test_data_pipeline.py
 2. **Wu et al. (2018)**, *MoleculeNet: a benchmark for molecular machine learning*. *Chemical Science*, 9(2), 513–530. [DOI: 10.1039/c7sc02664a](https://doi.org/10.1039/c7sc02664a)
 3. **Huang et al. (2014)**, *Profiling of the Tox21 10K compound library for agonists and antagonists of the estrogen receptor alpha signaling pathway*. *Scientific Reports*, 4, 5664. [DOI: 10.1038/srep05664](https://doi.org/10.1038/srep05664)
 4. **Fourches et al. (2010)**, *Trust, but Verify: On the Importance of Chemical Structure Curation in Cheminformatics and QSAR Modeling Research*. *Journal of Chemical Information and Modeling*, 50(7), 1189–1204. [DOI: 10.1021/ci100176x](https://doi.org/10.1021/ci100176x)
+
