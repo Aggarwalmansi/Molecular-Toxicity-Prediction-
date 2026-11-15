@@ -22,7 +22,6 @@ Member 1 owns the **foundation and ground truth** for all Phase 2 modeling and e
 ```
 phase2/member1_data_pipeline/
 ├── README.md                           # This documentation and data contract
-├── requirements.txt                    # Minimal production dependencies
 ├── configs/
 │   └── split_config.json               # Frozen split metadata, counts, checksums & weights
 ├── reports/
@@ -119,7 +118,7 @@ Weights are calculated strictly from training partition observed labels:
 
 ### 6.1 Installation
 ```bash
-pip install -r phase2/member1_data_pipeline/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 6.2 For Member 2: Deep Learning Model

@@ -23,7 +23,6 @@ Member 2 is responsible for the deep learning core of Phase 2, predicting all 12
 ```
 phase2/member2_deep_learning_model/
 ├── README.md                           # This documentation & handoff contract
-├── requirements.txt                    # Production DL dependencies
 ├── train.py                            # End-to-end training & orchestration script
 ├── configs/
 │   └── model_config.json               # Model dimensions, hyperparameters & training config

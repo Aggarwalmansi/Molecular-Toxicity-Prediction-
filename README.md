@@ -27,21 +27,21 @@ Molecular-Toxicity-Prediction-/
 
 ### Team Responsibilities & Core Modules
 
-* **[Phase 2 — Member 1: Data Pipeline & Literature](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member1_data_pipeline/README.md):**
+* **[Phase 2 — Member 1: Data Pipeline & Literature](phase2/member1_data_pipeline/README.md):**
   * Freezes the authoritative Bemis–Murcko scaffold split (Split B: **6,259 train / 782 validation / 782 test**, total **7,823 compounds**).
   * Formulates the exact 12-endpoint observation mask and positive class weight tensors ($w_j = 5.71 \to 38.85$) strictly from training data.
   * Curates 4 peer-reviewed literature foundations justifying multi-task learning and scaffold split methodology.
 
-* **[Phase 2 — Member 2: Deep Learning Multi-Task Model](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member2_deep_learning_model/README.md):**
+* **[Phase 2 — Member 2: Deep Learning Multi-Task Model](phase2/member2_deep_learning_model/README.md):**
   * Engineers `MultiTaskToxicNet` (1,219,212 parameters) predicting all 12 endpoints simultaneously via hard parameter sharing.
   * Implements `MaskedWeightedBCEWithLogitsLoss` strictly excluding 17.06% missing assay labels from gradient backpropagation.
   * Extracts 128-dimensional bottleneck embeddings ($z \in \mathbb{R}^{128}$) for downstream hybrid modeling.
 
-* **[Phase 2 — Member 3: ML + DL Hybrid Model](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member3_hybrid_model/README.md):**
+* **[Phase 2 — Member 3: ML + DL Hybrid Model](phase2/member3_hybrid_model/README.md):**
   * Trains 12 Random Forests on hybrid representations (128 latent embeddings + 5 standardized continuous descriptors = 133 features).
   * Evaluates descriptor ablation and honestly reports a negative result: hybrid modeling underperforms standalone models on compressed representations.
 
-* **[Phase 2 — Member 4: Comprehensive Evaluation & Systematic Ablations](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member4_evaluation/README.md):**
+* **[Phase 2 — Member 4: Comprehensive Evaluation & Systematic Ablations](phase2/member4_evaluation/README.md):**
   * Trains and evaluates **48 PyTorch model checkpoints** across 3 random seeds (**42, 21, 7**) under zero test-set leakage.
   * **Dropout Ablation:** Compares $p=0.35/0.175$ vs. $p=0.0$, demonstrating that dropout prevents fingerprint bit co-adaptation.
   * **Class-Weighting Ablation:** Shows that unweighted loss collapses active compound recall from 64.16% to 17.95% (surging false negatives from 249 to 558).
@@ -140,7 +140,13 @@ streamlit run app.py
 ## 6. Detailed Member Documentation
 
 For in-depth mathematical formulations, code APIs, hyperparameter configurations, and viva guides:
-- [Phase 2 — Member 1: Data Pipeline & Literature](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member1_data_pipeline/README.md)
-- [Phase 2 — Member 2: Deep Learning Model](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member2_deep_learning_model/README.md)
-- [Phase 2 — Member 3: ML + DL Hybrid Model](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member3_hybrid_model/README.md)
-- [Phase 2 — Member 4: Evaluation & Ablation Studies](file:///Users/aditisingh1619/Desktop/Molecular-Toxicity-Prediction-/phase2/member4_evaluation/README.md)
+- [Phase 2 — Member 1: Data Pipeline & Literature](phase2/member1_data_pipeline/README.md)
+- [Phase 2 — Member 2: Deep Learning Model](phase2/member2_deep_learning_model/README.md)
+- [Phase 2 — Member 3: ML + DL Hybrid Model](phase2/member3_hybrid_model/README.md)
+- [Phase 2 — Member 4: Evaluation & Ablation Studies](phase2/member4_evaluation/README.md)
+
+## Member 5: live inference and submission
+
+See [the Member 5 guide](phase2/member5_demo_submission/README.md) for setup, CLI prediction, the report and slides. Run `python -m phase2.member5_demo_submission.prepare_models` if the demo models are missing, then `streamlit run app.py`.
+
+**Result provenance correction:** the 0.7179 DL result is a historical evaluation, not a verified metric of the saved checkpoint. The original embeddings fail saved-checkpoint parity. Member 5 preserves those artifacts and exports a separate checkpoint-consistent demo hybrid and its metrics. The three-seed 0.7472 result is another experiment.

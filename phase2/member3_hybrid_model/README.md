@@ -167,7 +167,6 @@ learned features, and it is worth mentioning if asked.
 ```
 phase2/member3_hybrid_model/
 ├── README.md                          # this file
-├── requirements.txt
 ├── train_hybrid.py                    # entry point, runs the whole pipeline
 ├── configs/
 │   └── hybrid_config.json             # feature sources + forest settings
@@ -233,7 +232,7 @@ forests = load_forests()
 probabilities = predict_probabilities(forests, test_features)
 ```
 
-**Version note.** `requirements.txt` pins `scikit-learn==1.9.1` because the 12
+**Version note.** the model artifacts were serialized with `scikit-learn==1.9.1` because the 12
 files in `models/` were pickled with that version, and scikit-learn does not
 guarantee that a model saved by one version loads correctly in another. If you
 are on a different version, either install the pinned one or just retrain —

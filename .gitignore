@@ -5,3 +5,10 @@ __pycache__/
 *viva*.md
 
 member3_hybrid_model/README.md
+
+.member5-build/
+
+.chart-data-*/
+
+# Temporary Office lock files
+~$*

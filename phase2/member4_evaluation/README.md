@@ -26,7 +26,6 @@ Member 4 is responsible for the **final scientific evaluation, statistical bench
 ```
 phase2/member4_evaluation/
 ├── README.md                           # This documentation, benchmark report & viva guide
-├── requirements.txt                    # Certified production dependencies
 ├── run_all.py                          # Master CLI orchestrator (runs all tasks end-to-end)
 ├── configs/
 │   ├── evaluation_config.json          # Metrics, thresholds & scaffold split constants
@@ -288,7 +287,7 @@ All experiments are fully automated and executable from the repository root:
 source .venv/bin/activate
 
 # Install certified dependencies
-pip install -r phase2/member4_evaluation/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 9.2 Running Automated Quality Gates (10/10 Unit Tests)
