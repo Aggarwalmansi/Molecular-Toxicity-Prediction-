@@ -204,8 +204,13 @@ def get_network_runs():
     """
     Lists the saved deep learning runs to generate predictions for.
 
-    These are Member 4's nine multi-task runs (three configurations, three
-    seeds each) plus Member 2's original checkpoint.
+    These are the nine multi-task ablation runs (three configurations, three
+    seeds each) plus the main deep learning checkpoint.
+
+    The no_dropout checkpoints were archived to archive/ to keep the
+    repository small, so those three runs are skipped unless you move them
+    back. Nothing downstream needs them: the ensemble uses the six
+    class_weight runs, which are still here.
     """
     member4_dir = PROJECT_ROOT / "phase2" / "evaluation" / "checkpoints"
     runs = []
