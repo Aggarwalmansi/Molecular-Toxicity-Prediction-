@@ -1,0 +1,4 @@
+model,val_roc_auc,val_pr_auc,test_roc_auc,test_pr_auc
+rf_phase1,0.7978,0.4661,0.7541,0.3962
+dl6_rank_avg,0.806,0.4249,0.768,0.3641
+rf_plus_dl6_rank_w3,0.8191,0.4564,0.7779,0.3903

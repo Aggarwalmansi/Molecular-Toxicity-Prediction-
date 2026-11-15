@@ -245,9 +245,18 @@ class MultiTaskTrainer:
                 self.best_val_pr = val_pr
                 best_val_roc = val_roc
                 best_val_pr = val_pr
+                # state_dict() returns references to the live parameter
+                # tensors, not copies. Without .clone() these entries keep
+                # tracking the model as training continues, so by the end of
+                # fit() they hold the FINAL epoch's weights instead of the
+                # best epoch's, and the restore below silently loads the wrong
+                # model. Cloning freezes the values at this epoch.
                 best_state = {
                     "epoch": epoch,
-                    "model_state_dict": self.model.state_dict(),
+                    "model_state_dict": {
+                        key: value.detach().cpu().clone()
+                        for key, value in self.model.state_dict().items()
+                    },
                     "optimizer_state_dict": self.optimizer.state_dict(),
                     "val_loss": val_loss,
                     "val_macro_roc_auc": val_roc,

@@ -1,0 +1,7 @@
+variant,n_features,val_roc_auc,val_pr_auc,test_roc_auc,test_pr_auc
+corrected_emb_extratrees,133,0.7913,0.4153,0.7294,0.3527
+corrected_emb_plus_morgan_rf,2181,0.7838,0.4013,0.7239,0.354
+member4_emb_extratrees,133,0.7801,0.4067,0.7484,0.3572
+corrected_emb_rf,133,0.7736,0.4007,0.7175,0.3373
+member4_emb_plus_morgan_rf,2181,0.7696,0.3951,0.7424,0.3584
+original_hybrid_rf,133,0.7125,0.3616,0.6785,0.3037
