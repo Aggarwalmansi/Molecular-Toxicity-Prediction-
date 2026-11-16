@@ -1,8 +1,0 @@
-{
-  "checkpoint_sha256": "3a603f80d126d7067a0c2b927cf07b857bcae4ea868841ecbd02f9d7b591aada",
-  "sklearn_version": "1.8.0",
-  "torch_version": "2.11.0",
-  "training_split": "train",
-  "threshold": 0.5,
-  "note": "Member 5 demo refit; original Member 3 hybrid artifacts are unchanged."
-}

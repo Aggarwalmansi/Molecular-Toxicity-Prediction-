@@ -1,152 +1,76 @@
-# Molecular Toxicity Prediction (Tox21)
+# Molecular Toxicity Prediction — Team T028, Section D
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Hosted Live App](https://img.shields.io/badge/Streamlit-Live%20App-ff4b4b.svg)](https://molecular-toxicity-prediction.onrender.com/)
+An end-to-end Tox21 assay activity prediction project: chemical validation, molecular features, ML, residual multitask DL, feature fusion, probability blending and a unified Streamlit application.
 
-An end-to-end computational toxicology system benchmarking deep multitask neural architectures, tree ensembles, and hybrid representations across **12 biological pathways** (nuclear receptors and stress response pathways) using the **NIH Tox21 dataset**.
+## Current results
 
-**Hosted Interactive Application:** [https://molecular-toxicity-prediction.onrender.com/](https://molecular-toxicity-prediction.onrender.com/)
+Same frozen scaffold test partition (782 molecules); each endpoint uses observed labels only. Values are macro averages over 12 assays. “PR-AUC” in source CSVs means average precision.
 
----
+| Model | ROC-AUC | Average precision |
+|---|---:|---:|
+| Phase 1 RF | 0.7541 | 0.3962 |
+| Residual multitask DL | 0.7266 | 0.3298 |
+| Feature-fusion RF | 0.7156 | 0.3284 |
+| Stronger RF | 0.7674 | 0.4063 |
+| Probability blend | 0.7685 | 0.3983 |
 
-## 1. Project Overview & Phase 2 Architecture
+**Probability blending has the highest ROC-AUC (0.7685); stronger RF has the highest average precision (0.4063).** Stronger RF settings contribute +0.0133 ROC-AUC over Phase 1; blending adds +0.0011 and reduces AP from 0.4063 to 0.3983. Significance of that small increment is not established.
 
-Phase 2 scales the project from initial single-endpoint baselines into an enterprise-grade, multi-stage deep learning and cheminformatics platform. The system is partitioned into modular, certified packages:
+Sources: `phase2/member3_hybrid_model/reports/phase1_vs_phase2_summary.csv`, `raw_rf_test_evaluation.csv`, `ensemble_test_evaluation.csv`, and `phase2/member2_deep_learning_model/reports/test_evaluation.csv`.
 
-```
-Molecular-Toxicity-Prediction-/
-├── app.py                              # Interactive Streamlit web application
-├── phase2/
-│   ├── member1_data_pipeline/          # Certified scaffold split contract & masked data loaders
-│   ├── member2_deep_learning_model/    # MultiTaskToxicNet & 128-dim latent representation learning
-│   ├── member3_hybrid_model/           # Hybrid Random Forest on latent embeddings + descriptors
-│   └── member4_evaluation/             # Comprehensive benchmark, 48 ablation models & error analysis
-```
+## Dataset and features
 
-### Team Responsibilities & Core Modules
+7,831 raw records; 8 invalid structures excluded; 7,823 valid molecules. Frozen split: 6,259 train / 782 validation / 782 test. There are 16,012 missing assay entries (17.06%); they are masked, never interpreted as inactive. All 1,775 acyclic molecules are training-only, so holdout evaluation concerns ring-containing scaffolds.
 
-* **[Phase 2 — Member 1: Data Pipeline & Literature](phase2/member1_data_pipeline/README.md):**
-  * Freezes the authoritative Bemis–Murcko scaffold split (Split B: **6,259 train / 782 validation / 782 test**, total **7,823 compounds**).
-  * Formulates the exact 12-endpoint observation mask and positive class weight tensors ($w_j = 5.71 \to 38.85$) strictly from training data.
-  * Curates 4 peer-reviewed literature foundations justifying multi-task learning and scaffold split methodology.
+Inputs are 2,048 radius-2 Morgan bits plus five training-standardized descriptors, ordered MolWt, TPSA, MolLogP, NumHDonors, NumHAcceptors. Scaling and all forest fitting use training data only.
 
-* **[Phase 2 — Member 2: Deep Learning Multi-Task Model](phase2/member2_deep_learning_model/README.md):**
-  * Engineers `MultiTaskToxicNet` (1,219,212 parameters) predicting all 12 endpoints simultaneously via hard parameter sharing.
-  * Implements `MaskedWeightedBCEWithLogitsLoss` strictly excluding 17.06% missing assay labels from gradient backpropagation.
-  * Extracts 128-dimensional bottleneck embeddings ($z \in \mathbb{R}^{128}$) for downstream hybrid modeling.
+## Current models
 
-* **[Phase 2 — Member 3: ML + DL Hybrid Model](phase2/member3_hybrid_model/README.md):**
-  * Trains 12 Random Forests on hybrid representations (128 latent embeddings + 5 standardized continuous descriptors = 133 features).
-  * Evaluates descriptor ablation and honestly reports a negative result: hybrid modeling underperforms standalone models on compressed representations.
+The residual network uses 2,053 → 512 → 256 → 128, LayerNorm, GELU and 12 heads (128 → 64 → 1). It has 2,532,492 trainable parameters. Input/trunk/bottleneck/head dropout: 0.30/0.50/0.25/0.20. AdamW: learning rate 0.0003, weight decay 0.001; batch size 64; maximum 150 epochs; early stopping patience 20 on validation macro ROC-AUC. Cosine warm restarts: T_0=20, T_mult=2, eta_min=1e-6; gradient clipping norm 2.0. Positive weights are min(sqrt(N_negative/N_positive), 3.0), using training counts only.
 
-* **[Phase 2 — Member 4: Comprehensive Evaluation & Systematic Ablations](phase2/member4_evaluation/README.md):**
-  * Trains and evaluates **48 PyTorch model checkpoints** across 3 random seeds (**42, 21, 7**) under zero test-set leakage.
-  * **Dropout Ablation:** Compares $p=0.35/0.175$ vs. $p=0.0$, demonstrating that dropout prevents fingerprint bit co-adaptation.
-  * **Class-Weighting Ablation:** Shows that unweighted loss collapses active compound recall from 64.16% to 17.95% (surging false negatives from 249 to 558).
-  * **MultiTask vs. Single-Task Learning:** Trains 36 independent single-task neural networks; proves MultiTask learning achieves a **+0.0452 ROC-AUC advantage** via shared biological representations.
-  * **Toxicological Error Analysis:** Sweeps validation optimal $F_1$ decision thresholds; discovers that missed toxic compounds are heavier (+52.7 g/mol) and more polar (+12.4 Å² PSA).
-  * **Publication Artifacts:** Generates **18 high-resolution 300 DPI figures**, 10 CSV result matrices, and 4 detailed scientific reports.
+Feature fusion joins all 2,053 original features with 128 neural embeddings (2,181 total). Stronger raw-feature and fused forests use 200 trees, max_depth=15, min_samples_leaf=2, balanced weights and seed 42. Probability blending uses **0.80 × P_RF + 0.20 × P_DL**, with raw-feature arm and alpha chosen on validation data. The five descriptors are already in the original block; they are not added twice.
 
----
+Best DL checkpoint: epoch 3; validation ROC-AUC 0.7917; test ROC-AUC 0.7266 / AP 0.3298 / recall 0.2984 at threshold 0.5. Trunk regularization delays the best checkpoint but does not eliminate overfitting. Continuous embedding split-threshold effects are a possible explanation for weaker fusion, not an established cause.
 
-## 2. Master Architectural Benchmark (Holdout Test Split B)
+## Application and reproducibility
 
-All models were evaluated on the **exact same 782 holdout test molecules** with zero scaffold overlap against training or validation data:
+[Open the deployed application](https://molecular-toxicity-prediction.onrender.com/). To reproduce locally:
 
-| Model Architecture | Input Features | Holdout ROC-AUC | Holdout PR-AUC | $F_1$-Score | Balanced Accuracy | MCC | Key Takeaway |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Standalone Random Forest** | 2,053 (2,048 Morgan + 5 Descriptors) | **0.7541** | **0.3962** | **0.3969** | **0.6684** | **0.3141** | **Best overall benchmark** on sparse binary fingerprints |
-| **MultiTask Deep Learning** | 2,053 $\to$ 128 bottleneck $\to$ 12 heads | **0.7472 ± 0.0065** | **0.3286 ± 0.0145** | **0.3049 ± 0.0253** | **0.6974 ± 0.0253** | **0.2543 ± 0.0177** | Multi-task shared trunk transfers biological representations |
-| **Single-Task Deep Learning** | 2,053 per endpoint (12 independent nets) | **0.7020 ± 0.0076** | **0.3197 ± 0.0084** | 0.3335 ± 0.0167 | 0.6485 ± 0.0040 | 0.2500 ± 0.0118 | Lacks cross-task transfer; fails on data-poor assays ($\Delta = -0.0452$) |
-| **ML+DL Hybrid Model** | 133 (128 embeddings + 5 descriptors) | **0.6753** | **0.3009** | 0.2933 | 0.5921 | 0.2712 | Information-loss penalty from 128-dim bottleneck compression |
-
----
-
-## 3. Per-Endpoint Benchmark Breakdown
-
-Comparison of holdout test ROC-AUC across all 12 Tox21 pathways:
-
-| Endpoint | Target Pathway | Standalone RF ROC-AUC | MultiTask DL ROC-AUC | Single-Task DL ROC-AUC | ML+DL Hybrid ROC-AUC | Active Prevalence |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **NR-AR** | Androgen Receptor | 0.7387 | **0.7395** | 0.7078 | 0.6495 | 5.51% |
-| **NR-AR-LBD** | Androgen Receptor (LBD) | **0.8194** | 0.7468 | 0.7790 | 0.8138 | 3.33% |
-| **NR-AhR** | Aryl Hydrocarbon Receptor | **0.8274** | 0.7417 | 0.7773 | 0.6939 | 15.26% |
-| **NR-Aromatase** | Aromatase Enzyme | 0.7398 | **0.7459** | 0.6748 | 0.6859 | 9.41% |
-| **NR-ER** | Estrogen Receptor | **0.6335** | 0.5951 | 0.6114 | 0.5808 | 15.21% |
-| **NR-ER-LBD** | Estrogen Receptor (LBD) | **0.7294** | 0.6942 | 0.6729 | 0.6390 | 5.08% |
-| **NR-PPAR-gamma** | PPAR-$\gamma$ | **0.8078** | 0.7528 | 0.6715 | 0.6746 | 5.03% |
-| **SR-ARE** | Antioxidant Response | 0.7196 | **0.7334** | 0.7312 | 0.7200 | 25.15% |
-| **SR-ATAD5** | Genotoxicity / DNA Damage | **0.7376** | 0.6654 | 0.6665 | 0.6302 | 5.15% |
-| **SR-HSE** | Heat Shock Response | **0.7372** | 0.6877 | 0.6669 | 0.6344 | 9.00% |
-| **SR-MMP** | Mitochondrial Potential | 0.8274 | **0.8326** | 0.7935 | 0.7772 | 21.12% |
-| **SR-p53** | p53 Tumor Suppressor | **0.7317** | 0.6802 | 0.6714 | 0.6040 | 10.43% |
-| **MACRO AVERAGE** | — | **0.7541** | **0.7179** | **0.7020** | **0.6753** | **10.80%** |
-
----
-
-## 4. Key Scientific Insights & Systematic Ablations
-
-1. **Why Random Forest Beats Deep Learning on Fingerprints:**  
-   Morgan fingerprints (2,048 bits) are sparse and orthogonal. Decision trees execute axis-aligned orthogonal splits directly on informative substructure bits without requiring gradient optimization over high-dimensional continuous weights.
-2. **Why the Hybrid Model Fails (The Bottleneck Penalty):**  
-   Compressing 2,053 features into 128 dimensions creates an irreversible information loss penalty. Decision trees can no longer cleanly split on individual functional groups because they are blended into continuous linear combinations.
-3. **MultiTask Learning Transfers Representations (+0.0452 ROC-AUC):**  
-   Single-task models overfit on endpoints with low active counts (e.g., `NR-PPAR-gamma` with only 133 train actives). MultiTask learning leverages universal cellular stress signals learned on data-rich pathways (`SR-ARE`, `SR-MMP`) to regularize data-poor pathways.
-4. **Positive Class Weighting is Non-Negotiable for Safety Screening:**  
-   Without class weighting ($w_j = 1.0$), active recall collapses from **64.16% down to 17.95%**, causing **308 hazardous compounds to be missed as false negatives**.
-5. **Physicochemical Failure Mode Analysis:**  
-   Profiling prediction errors with continuous RDKit descriptors revealed that missed active compounds (false negatives) are **heavier (+52.7 g/mol)** and **more polar (+12.4 Å² PSA)** with significantly more hydrogen-bonding groups than detected active compounds.
-
----
-
-## 5. Quickstart & Execution
-
-### 5.1 Environment Setup
 ```bash
-# Clone the repository
-git clone https://github.com/Aggarwalmansi/Molecular-Toxicity-Prediction-.git
-cd Molecular-Toxicity-Prediction-
-
-# Create virtual environment and install dependencies
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 5.2 Run the Interactive Streamlit App
-```bash
+python -m pip install -r requirements.txt
+# Rebuild local serving forests and metrics if required:
+python -m phase2.member5_report_ppt.prepare_models
 streamlit run app.py
 ```
 
-### 5.3 Run Member Verification & Evaluation Suites
-```bash
-# Member 1 Data Pipeline Tests (10/10 PASS)
-.venv/bin/python -m unittest phase2/member1_data_pipeline/tests/test_data_pipeline.py
+Prediction serves four methods (48 scores): residual DL, feature-fusion RF, stronger raw-feature RF and the 80/20 blend. The Phase 1 baseline is retained as a historical comparison, not served as the stronger RF.
 
-# Member 2 Deep Learning Tests (10/10 PASS)
-.venv/bin/python -m unittest phase2/member2_deep_learning_model/tests/test_dl_model.py
+## Earlier experiments
 
-# Member 4 Comprehensive Evaluation Tests (10/10 PASS)
-.venv/bin/python -m unittest phase2/member4_evaluation/tests/test_evaluation.py
+`phase2/member4_evaluation/` retains **earlier-network** ablations. Multitask ROC-AUC 0.7472 ± 0.0065 versus single-task 0.7020 ± 0.0076 is a separate three-seed study, not the residual model's performance. ± denotes seed standard deviation. Old 0.7179/0.6753 tables and 133-feature experiments are historical and must not replace the current table above.
 
-# Run Full Member 4 Ablation & Evaluation Orchestrator
-.venv/bin/python -m phase2.member4_evaluation.run_all
-```
+## Project materials
 
----
+- [Data pipeline](phase2/member1_data_pipeline/README.md)
+- [Residual neural model](phase2/member2_deep_learning_model/README.md)
+- [Fusion and blending experiments](phase2/member3_hybrid_model/README.md)
+- [Earlier-network evaluation](phase2/member4_evaluation/README.md)
+- [Setup and reproduction guide](phase2/member5_report_ppt/README.md)
+- [Formal report](phase2/member5_report_ppt/report/main.tex)
+- [Presentation](phase2/member5_report_ppt/presentation/Molecular_Toxicity_T028_refined.pptx)
 
-## 6. Detailed Member Documentation
+## Team T028 — Section D
 
-For in-depth mathematical formulations, code APIs, hyperparameter configurations, and viva guides:
-- [Phase 2 — Member 1: Data Pipeline & Literature](phase2/member1_data_pipeline/README.md)
-- [Phase 2 — Member 2: Deep Learning Model](phase2/member2_deep_learning_model/README.md)
-- [Phase 2 — Member 3: ML + DL Hybrid Model](phase2/member3_hybrid_model/README.md)
-- [Phase 2 — Member 4: Evaluation & Ablation Studies](phase2/member4_evaluation/README.md)
+| Member | Name | Enrollment number | Contribution |
+|---|---|---|---|
+| 1 | Mansi Agarwal | 2401010264 | Data pipeline and feature engineering |
+| 2 | Nachiket Amlekar | 2401020039 | Multitask deep learning |
+| 3 | Tanisha Dhiman | 2401010475 | Hybrid models and probability blending |
+| 4 | Aditi Singh | 2401020006 | Evaluation and ablation studies |
+| 5 | Adamya Tiwari | 2401010025 | Application, report, presentation and reproduction guide |
 
-## Member 5: live inference and submission
+Assay activity scores are uncalibrated and do not establish human safety.
 
-See [the Member 5 guide](phase2/member5_demo_submission/README.md) for setup, CLI prediction, the report and slides. Run `python -m phase2.member5_demo_submission.prepare_models` if the demo models are missing, then `streamlit run app.py`.
-
-**Result provenance correction:** the 0.7179 DL result is a historical evaluation, not a verified metric of the saved checkpoint. The original embeddings fail saved-checkpoint parity. Member 5 preserves those artifacts and exports a separate checkpoint-consistent demo hybrid and its metrics. The three-seed 0.7472 result is another experiment.
+Reporting convention: endpoint metrics are rounded to four decimals before macro averaging, matching the current evaluation scripts. Full-precision averaging may differ in the last displayed decimal.

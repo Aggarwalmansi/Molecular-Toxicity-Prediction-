@@ -1,4 +1,4 @@
-# Phase 2 — Member 2: Multi-Task Deep Learning Model
+# Phase 2 — Multi-Task Deep Learning Model
 
 **Role:** Deep Learning Research Engineer & Representation Learning Specialist  
 **Status:** Trained, Verified & Production Ready  
@@ -8,12 +8,12 @@
 
 ## 1. Executive Summary & Deliverables
 
-Member 2 is responsible for the deep learning core of Phase 2, predicting all 12 Tox21 biological endpoints simultaneously using hard parameter sharing:
+Deep learning is responsible for the deep learning core of Phase 2, predicting all 12 Tox21 biological endpoints simultaneously using hard parameter sharing:
 1. **Multi-Task Neural Network (`MultiTaskToxicNet`):** PyTorch deep neural network accepting canonical 2,053-dim molecular features (`X_combined`: 2,048-bit Morgan circular fingerprints + 5 standardized physical descriptors) and predicting 12 target assays in a single forward pass.
-2. **Masked & Weighted Loss (`MaskedWeightedBCEWithLogitsLoss`):** Strictly excludes unmeasured assay targets (17.06% missing labels) from backpropagation while applying exact training-set positive class weights ($w_j = 5.71 \to 38.85$) to counter severe activity imbalance.
-3. **Regularization & Early Stopping:** Input dropout ($p=0.30$) on the raw fingerprint bits, trunk dropout ($p=0.50$), weight decay ($1\times 10^{-3}$), LayerNorm, gradient clipping at $\lVert g \rVert \le 2$, and early stopping on validation macro ROC-AUC under a `CosineAnnealingWarmRestarts` schedule ($T_0=20$, $T_{mult}=2$).
+2. **Masked & Weighted Loss (`MaskedWeightedBCEWithLogitsLoss`):** Strictly excludes unmeasured assay targets (17.06% missing labels) from backpropagation while applying square-root-damped training class ratios capped at 3.0 (raw ratios range from 5.71 to 38.85) to counter severe activity imbalance.
+3. **Regularization & Early Stopping:** Input dropout ($p=0.30$) on all raw input features, trunk dropout ($p=0.50$), weight decay ($1\times 10^{-3}$), LayerNorm, gradient clipping at $\lVert g \rVert \le 2$, and early stopping on validation macro ROC-AUC under a `CosineAnnealingWarmRestarts` schedule ($T_0=20$, $T_{mult}=2$).
 4. **Checkpoint Deliverable:** Certified best model checkpoint saved at `checkpoints/best_multitask_model.pt`.
-5. **Learned Molecular Features (Embeddings Handoff for Member 3):** 128-dimensional continuous latent representations $z \in \mathbb{R}^{128}$ extracted from the bottleneck layer for all 7,823 compounds (`train_embeddings.parquet`, `val_embeddings.parquet`, `test_embeddings.parquet`) with row-for-row compound ID alignment.
+5. **Learned Molecular Features (Embeddings Handoff for Hybrid modeling):** 128-dimensional continuous latent representations $z \in \mathbb{R}^{128}$ extracted from the bottleneck layer for all 7,823 compounds (`train_embeddings.parquet`, `val_embeddings.parquet`, `test_embeddings.parquet`) with row-for-row compound ID alignment.
 6. **Holdout Test Benchmark:** Evaluated on the 782-compound holdout test set across all 12 endpoints (ROC-AUC, PR-AUC, F1, Balanced Accuracy, MCC).
 
 ---
@@ -66,7 +66,7 @@ phase2/member2_deep_learning_model/
                 [2,048 Morgan circular bits + 5 standardized descriptors]
                                     │
                                     ▼
-                          Dropout(0.30) on the raw input bits
+                          Dropout(0.30) on the complete input vector
                                     │
                                     ▼
     ResidualBlock(2,053 → 512) ── LayerNorm ── GELU ── Dropout(0.50)
@@ -79,7 +79,7 @@ phase2/member2_deep_learning_model/
                                     │
                          ┌──────────┴──────────┐
                          │ Latent Bottleneck z │ ──▶ Exported as 128-dim Embeddings
-                         │  (128 dimensions)   │     for Member 3 (Hybrid RF Model)
+                         │  (128 dimensions)   │     for Hybrid modeling (Hybrid RF Model)
                          └──────────┬──────────┘
                                     │
                                     ▼
@@ -96,10 +96,10 @@ learned linear projection on the skip path where the dimensions change.
 
 | Choice | Reason |
 | :--- | :--- |
-| **LayerNorm, not BatchNorm** | Morgan fingerprints are ~98% zeros. BatchNorm normalizes each bit across the batch, so a bit that is on in 2 of 64 molecules gets rescaled by a near-zero batch variance, amplifying noise and destroying the sparsity structure. LayerNorm normalizes across features within one molecule, leaving the sparsity pattern intact. |
-| **GELU, not ReLU** | Smoother gradients through the residual trunk; no dead units on the many exactly-zero pre-activations that sparse inputs produce. |
+| **LayerNorm** | Normalizes hidden activations within each molecule rather than using minibatch statistics. This motivates its use with small batches; no universal disadvantage of BatchNorm is established. |
+| **GELU** | Provides a smooth nonlinear activation in the tested residual architecture; superiority over ReLU is not established by an isolated activation ablation. |
 | **Residual connections** | Keep a short gradient path to the input layer, so the 2,053 → 512 projection still receives usable gradient after three blocks. |
-| **Per-endpoint heads** | A single `Linear(128, 12)` forces one shared linear readout on all 12 endpoints, so Nuclear Receptor and Stress Response pathways fight over the same directions in `z`. Dedicated heads give each endpoint its own non-linear readout while the trunk stays shared. |
+| **Per-endpoint heads** | Each assay has a separate nonlinear readout while retaining a shared encoder. A single Linear(128,12) would still have independent output weights, but lacks the extra hidden layer per assay. |
 | **Input dropout (0.30)** | With 6,259 training molecules against 2,053 sparse inputs the trunk otherwise memorizes individual bits within five epochs (train loss 0.016, validation loss 2.22). See section 4.1. |
 
 - **Total Trainable Parameters:** **2,532,492**
@@ -225,19 +225,19 @@ Evaluated strictly on the held-out test partition with zero scaffold overlap wit
 
 ## 6. Downstream Integration & Handoff Contract
 
-### 6.1 For Member 3: Hybrid ML Model
-Member 3 can consume the extracted 128-dimensional latent representations directly:
+### 6.1 For Hybrid modeling: Hybrid ML Model
+Hybrid modeling can consume the extracted 128-dimensional latent representations directly:
 
 ```python
 import pandas as pd
 import numpy as np
 from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
 
-# 1. Load scaled continuous descriptors (Member 1)
+# 1. Load scaled continuous descriptors (Data pipeline)
 loader = Tox21DataLoader()
 X_desc_train, mids_desc = loader.load_features("descriptors_scaled", split="train") # (6259, 5)
 
-# 2. Load learned molecular embeddings (Member 2)
+# 2. Load learned molecular embeddings (Deep learning)
 df_emb = pd.read_parquet("phase2/member2_deep_learning_model/embeddings/train_embeddings.parquet")
 assert df_emb["molecule_id"].tolist() == mids_desc  # Guaranteed alignment
 z_train = df_emb.drop(columns=["molecule_id"]).to_numpy() # (6259, 128)
@@ -251,17 +251,17 @@ print(f"Fused input space ready: {X_hybrid_train.shape}")
 
 Do **not** replace the raw features with the embeddings. Feeding a Random
 Forest only `[z | descriptors]` (133 columns) drops test macro ROC-AUC to
-0.6785, because the 2,048 Morgan bits the forest splits on are gone. Member 3's
+0.6785, because the 2,048 Morgan bits the forest splits on are gone. the hybrid modeling module’s
 README section 3 has the measurements, and also shows that the best use of this
 representation is probability blending rather than input concatenation.
 
-### 6.2 For Member 4: Benchmark Comparison
-Member 4 evaluates all models on the identical holdout test split (`test_evaluation.csv`):
+### 6.2 For Evaluation: Benchmark Comparison
+Evaluation evaluates all models on the identical holdout test split (`test_evaluation.csv`):
 - Macro ROC-AUC: **0.7266**
 - Macro PR-AUC: **0.3298**
 - Peak Endpoints: **SR-MMP (0.8083)**, **NR-AhR (0.7986)**, **NR-AR (0.7736)**, **NR-AR-LBD (0.7664)**, **NR-PPAR-gamma (0.7509)**.
 
-### 6.3 For Member 5: Dashboard & Presentation
+### 6.3 For Application and reporting: Dashboard & Presentation
 - **Training plots**: Available under `reports/plots/` (`loss_curve.png`, `val_metrics_curve.png`, `per_endpoint_roc_pr.png`, `training_curves_summary.png`).
 - **Interactive Checkpoint**: `checkpoints/best_multitask_model.pt` can be loaded with PyTorch directly in the Streamlit application.
 
@@ -269,7 +269,7 @@ Member 4 evaluates all models on the identical holdout test split (`test_evaluat
 
 ## 7. Verification & Automated Test Suite
 
-Run the Member 2 test suite:
+Run the Deep learning test suite:
 
 ```bash
 python3 -m unittest phase2/member2_deep_learning_model/tests/test_dl_model.py
@@ -281,7 +281,7 @@ python3 -m unittest phase2/member2_deep_learning_model/tests/test_dl_model.py
 - **Test 3:** Masked loss invariance: unobserved label modification produces identical loss and gradient — **PASS**
 - **Test 4:** Zero gradient propagation for completely masked positions — **PASS**
 - **Test 5:** Checkpoint save and deserialization reproduces exact predictions — **PASS**
-- **Test 6:** Real batch integration with Member 1's `Tox21DataLoader` — **PASS**
+- **Test 6:** Real batch integration with the data pipeline module’s `Tox21DataLoader` — **PASS**
 - **Test 7:** Embeddings artifacts integrity (6,259 train, 782 val, 782 test) — **PASS**
 - **Test 8:** Saved production checkpoint loads and passes validation sanity check — **PASS**
 - **Test 9:** Test evaluation report completeness (12 endpoints + MACRO AVERAGE) — **PASS**

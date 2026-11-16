@@ -1,6 +1,8 @@
-# Phase 2 — Member 3: ML + DL Hybrid Model
+> **Current application:** The Streamlit predictor now serves the revised residual DL, 2,181-feature fusion RF, stronger raw-feature RF and 80/20 probability blend. The serving bundle uses 200 trees, depth 15 and minimum leaf size 2. Macro reporting rounds endpoint metrics to four decimals before averaging.
 
-**Role:** Hybrid modelling — combining Member 1's features with Member 2's learned representation
+# Phase 2 — ML + DL Hybrid Model
+
+**Role:** Hybrid modelling — combining the data pipeline module’s features with the deep learning module’s learned representation
 **Status:** Complete. Phase 2 now beats the Phase 1 baseline.
 **Headline finding:** Combining the two models at the **probability** level works
 (+0.0144 test ROC-AUC over Phase 1). Combining them at the **input** level does
@@ -10,13 +12,13 @@ not, and the measurements explaining why are in section 3.
 
 ## 1. What the hybrid is
 
-Two ways of combining a Random Forest with Member 2's network were implemented
+Two ways of combining a Random Forest with the deep learning module’s network were implemented
 and measured.
 
 **(a) Feature fusion — concatenate the inputs.**
 
 ```
-2048 Morgan bits + 5 descriptors          Member 2's network (frozen)
+2048 Morgan bits + 5 descriptors          the deep learning module’s network (frozen)
         (2053 raw)                           2053 -> 512 -> 256 -> 128 (z)
              |                                            |
              +------------- CONCATENATE ------------------+
@@ -35,7 +37,7 @@ is what dropped test ROC-AUC to 0.6785.
 ```
 Random Forest on raw features  ->  P_rf  --\
                                             >--  alpha * P_rf + (1-alpha) * P_dl
-Member 2's network             ->  P_dl  --/
+the deep learning module’s network             ->  P_dl  --/
 ```
 
 `alpha` is tuned on the **validation split only** over
@@ -57,7 +59,7 @@ threshold.
 | Model | Features | ROC-AUC | PR-AUC | vs Phase 1 |
 |---|---|---|---|---|
 | Standalone Random Forest (Phase 1 baseline) | 2053 | 0.7541 | 0.3962 | — |
-| Standalone Deep Learning (Member 2, retrained) | 2053 → 12 | 0.7266 | 0.3298 | −0.0275 |
+| Standalone Deep Learning (Deep learning, retrained) | 2053 → 12 | 0.7266 | 0.3298 | −0.0275 |
 | Hybrid, feature fusion | 2181 | 0.7156 | 0.3284 | −0.0385 |
 | Random Forest, upgraded settings | 2053 | 0.7674 | **0.4063** | **+0.0133** |
 | **Hybrid, probability blending (alpha=0.80)** | 2053 + DL | **0.7685** | 0.3983 | **+0.0144** |
@@ -140,7 +142,7 @@ which is why the shipped ensemble blends probabilities instead.
 
 Missing labels are never treated as negatives. For each endpoint, the training
 set is filtered to only the molecules whose label for *that* endpoint was
-measured, using Member 1's observation mask:
+measured, using the data pipeline module’s observation mask:
 
 ```python
 observed = mask[:, endpoint_index]
@@ -165,7 +167,7 @@ only if its label for that endpoint exists.
 
 | Control | How |
 |---|---|
-| Splits | Member 1's frozen scaffold split, unchanged (6259 / 782 / 782) |
+| Splits | the data pipeline module’s frozen scaffold split, unchanged (6259 / 782 / 782) |
 | Descriptor scaling | Fitted on training data only in Phase 1, reused as-is |
 | Model fitting | Forests fitted on the training split only |
 | Model selection | Feature set, forest settings and the blending weight alpha all decided on **validation** |
@@ -193,7 +195,7 @@ phase2/member3_hybrid_model/
 ├── src/
 │   ├── hybrid_features.py             # builds the 2181-feature fused matrix
 │   ├── hybrid_model.py                # 12 forests + blend_predictions()
-│   ├── dl_predictions.py              # scores Member 2's checkpoint for blending
+│   ├── dl_predictions.py              # scores the deep learning module’s checkpoint for blending
 │   ├── fusion_study.py                # validation-only study behind section 3
 │   ├── evaluate_hybrid.py             # metrics + three-way comparison
 │   ├── check_rf_settings.py           # validation-only settings check
@@ -222,7 +224,7 @@ phase2/member3_hybrid_model/
 
 ### What each main file does
 
-- **`hybrid_features.py`** — reads Member 1's raw 2,053 features and Member 2's
+- **`hybrid_features.py`** — reads the data pipeline module’s raw 2,053 features and the deep learning module’s
   saved embeddings, checks the molecule order matches row-for-row, and
   concatenates them into 2,181 columns. The `use_raw_features` /
   `use_embeddings` / `use_descriptors` switches produce the four ablation arms
@@ -231,7 +233,7 @@ phase2/member3_hybrid_model/
   mask; `train_all_endpoints()` fits the 12 forests; `save_forests()` writes
   them to `models/`; `blend_predictions()` implements
   `alpha * P_rf + (1 - alpha) * P_dl`.
-- **`dl_predictions.py`** — rebuilds Member 2's network from their own config
+- **`dl_predictions.py`** — rebuilds the deep learning module’s network from their own config
   and checkpoint and scores a split with it. Nothing is retrained, so the
   blended numbers use their model exactly as trained.
 - **`fusion_study.py`** — the validation-only evidence for section 3: the

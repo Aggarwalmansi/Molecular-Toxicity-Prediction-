@@ -1,4 +1,8 @@
-# Phase 2 — Member 1: Data Pipeline & Literature
+> **Presentation terminology:** 703 held-out test scaffold groups, not 703 individual molecules. Overall active rates are 2.89–16.17%; training rates are 2.51–14.91%. Treating missing labels as inactive creates unsupported negative labels, not known false negatives.
+
+> **Current neural loss:** This loader provides raw training ratios N_negative/N_positive. The current residual model applies square-root damping and a cap of 3.0; raw ratios below are not the final loss weights.
+
+# Phase 2 — Data Pipeline & Literature
 
 **Role:** ML Infrastructure & Cheminformatics Data Engineer
 **Status:** Certified & Frozen Ground Truth
@@ -8,7 +12,7 @@
 
 ## 1. Executive Summary & Module Responsibility
 
-Member 1 owns the **foundation and ground truth** for all Phase 2 modeling and evaluation:
+Data pipeline owns the **foundation and ground truth** for all Phase 2 modeling and evaluation:
 1. **Frozen Dataset & Split Contract:** Freezes the single authoritative Bemis–Murcko scaffold split (Split B: **6,259 train / 782 validation / 782 test**, total **7,823 compounds**).
 2. **Feature Handoff Contract:** Connects precomputed Phase 1 feature matrices (`X_combined`, `X_morgan_unsupervised_filtered`, `X_descriptors_scaled`) without re-computation or data leakage.
 3. **Labels & Observation Masks:** Preserves experimental missing labels strictly as IEEE 754 `NaN` and provides explicit boolean observation masks for all 12 endpoints.
@@ -47,7 +51,7 @@ Downstream members must consume **Split B exclusively** (`tox21_member2_handoff/
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | **Train** | **6,259** | 80.01% | 998 | 1,775 | Multi-task DL & ML training |
 | **Validation** | **782** | 10.00% | 703 | 0 | Early stopping & hyperparameter tuning |
-| **Test** | **782** | 10.00% | 703 | 0 | Unbiased holdout benchmark (Member 4) |
+| **Test** | **782** | 10.00% | 703 | 0 | Unbiased holdout benchmark (Evaluation) |
 | **Total Valid** | **7,823** | 100.00% | 2,404 | 1,775 | Certified handoff population |
 
 - **Zero Overlap:** Train $\cap$ Val = 0, Train $\cap$ Test = 0, Val $\cap$ Test = 0 (for both molecule IDs and Bemis–Murcko scaffolds).
@@ -68,10 +72,10 @@ All feature matrices maintain **100.0% row-for-row compound-ID alignment** with 
 
 | Feature Set Identifier | Dimensions ($D$) | Description | Primary Consumer |
 | :--- | :---: | :--- | :--- |
-| `'combined'` | **2,053** | 2,048 binary Morgan bits (radius=2) + 5 standardized descriptors | **Member 2 (DL Canonical)** |
-| `'morgan_filtered'` | **1,011** | High-variance Morgan bits ($\text{Var}_{\text{train}} \ge 0.005$) | Member 2 (Ablation / Compact DL) |
-| `'descriptors_scaled'` | **5** | Continuous descriptors standardized on train ($Z$-score) | **Member 3 (Hybrid RF)** |
-| `'morgan'` | **2,048** | Binary circular fingerprints (ECFP4-like) | Member 4 (Ablation study) |
+| `'combined'` | **2,053** | 2,048 binary Morgan bits (radius=2) + 5 standardized descriptors | **Deep learning (DL Canonical)** |
+| `'morgan_filtered'` | **1,011** | High-variance Morgan bits ($\text{Var}_{\text{train}} \ge 0.005$) | Deep learning (Ablation / Compact DL) |
+| `'descriptors_scaled'` | **5** | Continuous descriptors standardized on train ($Z$-score) | **Hybrid modeling (Hybrid RF)** |
+| `'morgan'` | **2,048** | Binary circular fingerprints (ECFP4-like) | Evaluation (Ablation study) |
 | `'descriptors_raw'` | **5** | Raw continuous descriptors (`MolWt`, `TPSA`, `MolLogP`, `NumHDonors`, `NumHAcceptors`) | Baseline inspection |
 | `'combined_raw'` | **2,053** | 2,048 Morgan bits + 5 raw continuous descriptors | Baseline inspection |
 
@@ -79,8 +83,8 @@ All feature matrices maintain **100.0% row-for-row compound-ID alignment** with 
 
 ## 5. Label Masking & Class Weighting Contract
 
-### 5.1 Masked Loss Formulation (for Member 2 DL Model)
-Because 17.06% of assay readouts are unmeasured, Member 2's multitask loss must multiply the binary cross-entropy by the boolean observation mask $m_{ij} \in \{0, 1\}$:
+### 5.1 Masked Loss Formulation (for Deep learning DL Model)
+Because 17.06% of assay readouts are unmeasured, the deep learning module’s multitask loss must multiply the binary cross-entropy by the boolean observation mask $m_{ij} \in \{0, 1\}$:
 
 $$\mathcal{L}_{\text{multitask}} = \frac{1}{\sum_{i=1}^B \sum_{j=1}^{12} m_{ij}} \sum_{i=1}^B \sum_{j=1}^{12} m_{ij} \cdot \left[ - w_j y_{ij} \log(\hat{y}_{ij}) - (1 - y_{ij}) \log(1 - \hat{y}_{ij}) \right]$$
 
@@ -121,7 +125,7 @@ Weights are calculated strictly from training partition observed labels:
 pip install -r requirements.txt
 ```
 
-### 6.2 For Member 2: Deep Learning Model
+### 6.2 For Deep learning: Deep Learning Model
 ```python
 from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
 
@@ -146,7 +150,7 @@ pos_weights = loader.get_class_weights(as_tensor=True)  # torch.FloatTensor of s
 #     ) * mask_batch).sum() / mask_batch.sum()
 ```
 
-### 6.3 For Member 3: ML + DL Hybrid Model
+### 6.3 For Hybrid modeling: ML + DL Hybrid Model
 ```python
 from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
 import numpy as np
@@ -157,7 +161,7 @@ loader = Tox21DataLoader()
 X_desc_train, _ = loader.load_features("descriptors_scaled", split="train") # (6259, 5)
 X_desc_test, _  = loader.load_features("descriptors_scaled", split="test")  # (782, 5)
 
-# 2. Assume Member 2 provides learned latent embeddings: z_train (6259, D_latent), z_test (782, D_latent)
+# 2. Assume Deep learning provides learned latent embeddings: z_train (6259, D_latent), z_test (782, D_latent)
 # X_hybrid_train = np.hstack([z_train, X_desc_train])
 # X_hybrid_test  = np.hstack([z_test, X_desc_test])
 
@@ -168,7 +172,7 @@ for ep_idx, ep in enumerate(loader.TARGET_ASSAYS):
     # rf.fit(X_hybrid_train[obs], y_tr[obs, 0])
 ```
 
-### 6.4 For Member 4: Rigorous Evaluation & Ablation Studies
+### 6.4 For Evaluation: Rigorous Evaluation & Ablation Studies
 ```python
 from phase2.member1_data_pipeline.src.data_loader import Tox21DataLoader
 
@@ -186,7 +190,7 @@ assert test_mids == test_mids_y  # Guaranteed row-for-row alignment
 #     roc = roc_auc_score(y_true, y_pred_prob[obs])
 ```
 
-### 6.5 For Member 5: Streamlit App & Presentation Report
+### 6.5 For Application and reporting: Streamlit App & Presentation Report
 - Load `phase2/member1_data_pipeline/reports/class_imbalance.csv` directly for interactive data distribution charts in Streamlit.
 - Reference `phase2/member1_data_pipeline/literature/literature_table.csv` for the IEEE report literature section.
 

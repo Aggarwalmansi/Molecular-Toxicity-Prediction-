@@ -1,0 +1,281 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath,amssymb,graphicx,booktabs,array,url}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{1em}
+\renewcommand{\arraystretch}{1.12}
+\hypersetup{pdftitle={Molecular Toxicity Prediction -- Team T028},
+ pdfauthor={Adamya Tiwari, Tanisha Dhiman, Aditi Singh, Nachiket Amlekar, Mansi Agarwal}}
+\begin{document}
+\onecolumn
+\begin{titlepage}
+\centering
+\vspace*{22mm}
+{\large\sffamily TEAM T028\quad |\quad SECTION D\par}
+\vspace{18mm}
+{\Huge\bfseries Molecular Toxicity\\[6pt] Prediction\par}
+\vspace{12mm}
+{\Large Machine Learning, Multitask Neural Networks\\[5pt]
+and Hybrid Random Forests\par}
+\vspace{15mm}
+{\large Project Report\par}
+\vspace{3mm}
+{\large Phase 1 and Phase 2\par}
+\vfill
+{\large
+\begin{tabular}{ll}
+\toprule
+\textbf{Name} & \textbf{Roll number}\\\midrule
+Adamya Tiwari & 2401010025\\
+Tanisha Dhiman & 2401010475\\
+Aditi Singh & 2401020006\\
+Nachiket Amlekar & 2401020039\\
+Mansi Agarwal & 2401010264\\\bottomrule
+\end{tabular}\par}
+\vspace{18mm}
+{\large November 2026\par}
+\vspace{10mm}
+\end{titlepage}
+\twocolumn
+\begin{abstract}
+We compare classical machine learning, residual multitask deep learning, feature-fusion forests and probability blending for 12 Tox21 assays. The dataset contains 7,823 validated molecules, split into 6,259 training, 782 validation and 782 test compounds. Molecules use 2,048 Morgan bits and five standardized descriptors, with unmeasured labels masked. The current neural model achieves test macro ROC-AUC 0.7266 and average precision 0.3298. Feature fusion achieves 0.7156/0.3284, stronger raw-feature RF 0.7674/0.4063 and the validation-selected 80/20 RF--DL blend 0.7685/0.3983. The historical Phase 1 RF reports 0.7541/0.3962. Most ROC-AUC improvement comes from the stronger forest; blending adds 0.0011 ROC-AUC while lowering average precision. The application serves the current residual model, stronger forest, feature-fusion model and probability blend. Earlier-network ablations are retained as separate experiments.
+\end{abstract}
+\begin{IEEEkeywords}Tox21, multitask learning, molecular fingerprints, scaffold split, hybrid ensembles\end{IEEEkeywords}
+
+\section{Problem and Scope}
+The objective is to estimate binary biological activity across seven nuclear receptor and five stress response assays from molecular structure. The 12 outputs are not mutually exclusive. Assay activity is narrower than human toxicity: an inactive prediction does not establish chemical safety. Phase 1 implemented Logistic Regression, Decision Tree and Random Forest baselines. Phase 2 adds shared neural representations, a hybrid classifier, controlled ablations and saved-model inference.
+
+\subsection{Research Questions and Contributions}
+The study asks three questions: (1) does a shared neural representation improve prediction across sparsely labelled assays; (2) does a forest benefit from learned molecular embeddings; and (3) can the evaluated models be reproduced at inference time? The contributions are a common data contract, a masked multitask implementation, controlled representation comparisons, and an inference audit that exposed an artifact inconsistency. The hybrid is evaluated as an empirical hypothesis rather than assumed to outperform its components.
+
+\subsection{Project Objectives and Scope}
+The complete workflow comprises molecular data validation, exploratory analysis, feature engineering, classical baselines, deep learning, hybrid experiments, technical validation, and a unified inference dashboard. The scope is prediction of assay activity from two-dimensional structure. Clinical toxicity, dose response and regulatory safety assessment are outside the evaluated task.
+
+\section{Related Work}
+DeepTox motivates multitask neural toxicity prediction on Tox21~\cite{deeptox}. MoleculeNet supplies molecular benchmark and scaffold-evaluation context~\cite{moleculenet}. Huang and colleagues provide biological context for estrogen receptor measurements, rather than a complete provenance claim for all 12 tasks~\cite{huang}. Fourches and colleagues motivate chemical curation before QSAR modeling~\cite{fourches}. Morgan fingerprints~\cite{morgan} and Random Forests~\cite{breiman} provide established representations and predictive methods. These sources motivate experiments but do not establish that the current neural or hybrid method must outperform a strong baseline.
+
+\subsection{How the Literature Informs the Design}
+The fingerprint approach provides a fixed-dimensional representation that can be reused by both classical and neural methods. This makes comparisons easier to interpret because a change in predictive model need not also change the input representation. Random Forest provides a strong nonlinear reference with limited preprocessing demands. Multitask learning introduces a different inductive bias: assays share internal representations while retaining separate outputs. Sharing may help when useful structural patterns recur across endpoints, but it can also create negative transfer when endpoints require conflicting features.
+
+The hybrid experiment tests a specific extension of these ideas. A supervised neural encoder learns a compact representation from all assays, while downstream forests make endpoint-specific decisions. This rationale does not guarantee an improvement: a representation optimized for neural output heads may discard detail that a forest would otherwise use. The experimental design therefore retains the original-feature RF and standalone neural model as essential controls.
+
+
+\section{Dataset and Leakage Controls}
+Eight unparseable structures are excluded from the original 7,831 records, leaving 7,823 valid compounds. Approximately 17.06\% of assay entries are unmeasured. The authoritative Phase 2 split is Member 1's frozen split B, matching \texttt{labels\_and\_splits.parquet}. It contains 6,259/782/782 training/validation/test compounds. The older Phase 1 split manifest is a different partition and must not be mixed with these artifacts.
+
+Molecules are aligned explicitly by identifier before consuming features. Identical split membership is retained across model comparisons. Descriptor scaling uses training statistics only. Hyperparameter and checkpoint selection use validation data; the test set is reserved for evaluation. Inference does not read labels or fit preprocessing.
+
+\begin{table}[t]
+\caption{Dataset partitions and their permitted uses}
+\label{tab:data}\centering
+\begin{tabular}{lrp{0.40\columnwidth}}\toprule
+Partition & Molecules & Purpose\\\midrule
+Training & 6,259 & Fit models and scaler\\
+Validation & 782 & Select settings and checkpoints\\
+Test & 782 & Report final performance\\\midrule
+Total & 7,823 & 12 assay outputs per molecule\\\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Label Structure and Assay Coverage}
+Each molecule has up to 12 labels, with 1 indicating active, 0 indicating inactive, and a missing entry indicating that the corresponding assay outcome is unavailable. There are $7,823\times12=93,876$ possible molecule--assay entries. The data audit records 16,012 missing entries, leaving 77,864 observed labels. Consequently, a compound can contribute to one endpoint's training loss while being excluded from another endpoint's loss in the same minibatch.
+
+\begin{table}[htbp]
+\centering\caption{Assay groups represented in the prediction task}
+\begin{tabular}{p{0.27\columnwidth}p{0.62\columnwidth}}\toprule
+Group & Endpoints\\\midrule
+Nuclear receptors & NR-AR, NR-AR-LBD, NR-AhR, NR-Aromatase, NR-ER, NR-ER-LBD, NR-PPAR-gamma\\
+Stress response & SR-ARE, SR-ATAD5, SR-HSE, SR-MMP, SR-p53\\\bottomrule
+\end{tabular}
+\end{table}
+
+Missingness and imbalance are different problems. Masking addresses unavailable outcomes; positive-class weighting addresses unequal active and inactive counts among observed outcomes. Neither procedure creates new experimental evidence. In particular, imputation of missing outcomes as inactive would increase the apparent negative population and change the supervised task.
+
+\subsection{Scaffold Policy and Distribution Shift}
+The frozen partition groups molecules using their structural scaffolds to reduce overlap of molecular cores between training and evaluation. The audit records zero scaffold and molecule-identifier overlap across the three partitions. It also records an important boundary: all 1,775 acyclic molecules occur in training, and none occur in validation or test. The reported evaluation therefore concerns the held-out scaffold population and does not directly estimate performance on unseen acyclic molecules.
+
+A random split can place structurally similar compounds in both training and test data. This can make prediction easier than generalization to new scaffold families. A scaffold split is a useful stress test, but it is not a complete simulation of prospective deployment: assay prevalence, chemical coverage and collection practices can also change. Comparisons between split policies should therefore report the population and prevalence of each evaluation set.
+
+\subsection{Integrity Checks Before Model Fitting}
+The pipeline checks that molecule identifiers align across metadata, fingerprints and descriptors. Counts must satisfy observed labels equals active plus inactive labels, and total entries equals observed plus missing entries. The committed audit passes these checks across all endpoints and partitions. All evaluation endpoints contain both classes; the smallest positive counts are 24 in validation and 21 in test. These counts permit ROC-AUC computation, while also indicating why rare-endpoint estimates can be variable.
+
+The scaler is fitted on 6,259 training molecules. Feature matrices and split metadata are saved as reusable artifacts so downstream models share the same data contract. Any future regeneration must preserve molecule ordering or explicitly realign by identifier before fitting models.
+
+
+\section{Representations and Models}
+\subsection{Molecular Features}
+Each molecule is represented by a radius-2, 2,048-bit Morgan fingerprint concatenated with molecular weight, topological polar surface area, MolLogP, hydrogen-bond donor count and hydrogen-bond acceptor count. Continuous descriptors are standardized using committed training means and standard deviations. Their positional order is preserved during inference.
+
+
+\subsection{Feature Construction and Interpretation}
+Morgan fingerprints summarize local atom environments using iterative neighborhood expansion. Radius 2 captures neighborhoods extending up to two bonds from an atom; hashing maps the resulting identifiers into 2,048 binary positions. A bit represents the presence of at least one encoded environment rather than a unique, directly interpretable chemical group. Hash collisions and the fixed radius limit the information available to downstream models.
+
+The five continuous descriptors complement the local fingerprint with broad molecular properties. Molecular weight summarizes size, TPSA summarizes polar surface contribution, MolLogP estimates lipophilicity, and hydrogen-bond donor and acceptor counts summarize interaction potential. For descriptor $k$, standardization is
+\begin{equation}
+\widetilde d_{ik}=\frac{d_{ik}-\mu_{k,\mathrm{train}}}{\sigma_{k,\mathrm{train}}}.
+\end{equation}
+The saved training mean and standard deviation are reused unchanged for validation, test and user inputs. Binary fingerprint bits are concatenated with these standardized descriptors in a fixed order. Swapping two descriptor columns would silently change the meaning of the neural input, so feature parity is tested numerically.
+
+The repository also contains variance-filtered and PCA feature artifacts from exploratory feature engineering. The production comparisons described here use the original combined 2,053-dimensional representation; those alternative artifacts must not be assumed to be inputs to the saved models.
+
+
+\subsection{Residual Multitask Neural Network}
+The current MultiTaskToxicNet has 2,532,492 trainable parameters. Three residual blocks map $2053\rightarrow512\rightarrow256\rightarrow128$. Every block applies a linear transformation, LayerNorm, GELU and dropout, followed by addition of a learned linear skip projection. The dimensions differ at each block, so the skip path uses a projection rather than an identity map. Twelve task heads independently map $128\rightarrow64\rightarrow1$, with GELU and head dropout. Sigmoid converts the logits into activity scores. Softmax would impose an incorrect mutually exclusive interpretation of the assays.
+
+\begin{figure}[htbp]\centering
+\fbox{\parbox{0.9\linewidth}{\centering\footnotesize
+2,053 molecular inputs $\rightarrow$ input dropout\\[4pt]
+Residual blocks: $512\rightarrow256\rightarrow128$ (LayerNorm + GELU)\\[4pt]
+12 heads: $128\rightarrow64\rightarrow1$ $\rightarrow$ sigmoid\\[6pt]
+Feature fusion: $[\mathbf{x};\mathbf{z}]\in\mathbb{R}^{2181}\rightarrow12$ forests\\[4pt]
+Probability blend: $0.80\,P_{\mathrm{RF}}+0.20\,P_{\mathrm{DL}}$}}
+\caption{Current neural and hybrid prediction routes. The original molecular block already includes the five descriptors.}
+\label{fig:architecture}\end{figure}
+
+\subsection{Masked and Damped Class-Weighted Loss}
+Let $m_{ij}$ indicate an observed assay label. Raw training class ratios are square-root damped and capped:
+\begin{align}
+w_j&=\min\left(\sqrt{N_{\mathrm{neg},j}/N_{\mathrm{pos},j}},3.0\right),\\
+\ell_{ij}&=-w_jy_{ij}\log p_{ij}\\
+&\quad -(1-y_{ij})\log(1-p_{ij}),\nonumber\\
+\mathcal L&=\frac{\sum_{i,j}m_{ij}\ell_{ij}}{\sum_{i,j}m_{ij}}.
+\end{align}
+Missing tensor entries receive finite placeholders before unreduced loss calculation, then are excluded with the mask. The placeholders do not become negative training labels. Damping limits the contribution of large class ratios; all counts come from training. Weights change the optimization objective and do not calibrate output probabilities.
+
+\subsection{Optimization and Regularization}
+AdamW uses learning rate $3\times10^{-4}$ and weight decay $10^{-3}$. Batch size is 64, training is capped at 150 epochs and early stopping monitors validation macro ROC-AUC with patience 20. CosineAnnealingWarmRestarts uses $T_0=20$, $T_{\mathrm{mult}}=2$, and minimum learning rate $10^{-6}$. Gradient clipping limits the norm to 2.0. Input dropout is 0.30, trunk dropout 0.50, bottleneck dropout 0.25, and task-head dropout 0.20. Input dropout applies to the complete input tensor, including descriptors, rather than a fingerprint-only slice.
+
+The earlier design rapidly overfit. A regularization sweep investigated dropout, learning rate, weight decay and smaller hidden widths. In the selected cap-3 run, the best checkpoint is epoch 3 with validation ROC-AUC 0.7917. The sweep CSV also includes cap-10 trials near 0.7929; those are not the selected checkpoint's validation metric. Moving the best checkpoint later does not establish that overfitting has been eliminated. LayerNorm removes dependence on minibatch normalization statistics; this does not prove BatchNorm universally harms sparse inputs.
+
+\subsection{Classical Baselines and Stronger Forest}
+Phase 1 uses Logistic Regression (balanced weights, maximum 1,000 iterations), Decision Tree (depth 10, balanced weights), and Random Forest (100 trees, depth 12, balanced weights, seed 42). Their historical macro ROC-AUC/AP values are 0.7152/0.2949, 0.6428/0.2091 and 0.7541/0.3962 respectively. These provide linear, single-tree nonlinear and ensemble references.
+
+The current stronger RF uses 200 trees, maximum depth 15, minimum leaf size 2, balanced weights and seed 42. It consumes the original 2,053 features. One forest is trained per endpoint on observed training rows. The same settings are used for the fused arm, allowing a direct raw-versus-fused representation comparison within the current experiment.
+
+\subsection{Feature Fusion and Probability Blending}
+Feature fusion concatenates the original 2,053 features with 128 frozen neural embeddings: $2053+128=2181$. The five descriptors are already in the original block and are not added twice. The validation ablation compares embeddings only, embeddings plus descriptors, raw features only and full fusion. Raw features achieve validation ROC-AUC 0.8044 versus 0.7800 for fusion; this selects the raw-feature arm for probability blending.
+
+The ensemble score is $P=\alpha P_{\mathrm{RF}}+(1-\alpha)P_{\mathrm{DL}}$. The validation grid spans 0.50--0.90 in steps of 0.05. The reported selected weight is 0.80; it is fixed before test evaluation. Displayed validation scores for 0.80 and 0.85 both round to 0.8079, so the rounded CSV alone cannot reconstruct the full-precision selection. The code selects the first strictly best unrounded score. The config's generic default alpha 0.60 is not the selected ensemble weight.
+
+A possible reason for weaker fusion is that continuous embeddings provide more candidate split thresholds than binary bits. This alone does not prove that embeddings caused the performance loss. Likewise, a weighted average is not guaranteed to improve both ranking metrics.
+
+\section{Evaluation and Results}
+All current comparisons use the same frozen test partition of 782 molecules, restricted to observed labels independently per assay. Metrics are macro averages across 12 assays. Endpoint metrics are rounded to four decimals before macro averaging, matching the experiment scripts; full-precision aggregation can change the final displayed decimal. Source experiment artifacts are the current hybrid summary, raw-RF evaluation, ensemble evaluation and neural test evaluation. Source CSVs call average precision ``PR-AUC''.
+\begin{table}[t]\centering\small
+\caption{Current published experiment comparison; the Phase 1 row is historical}
+\label{tab:main}
+\begin{tabular}{lrr}\toprule Model & ROC-AUC & AP\\\midrule
+Phase 1 RF & 0.7541 & 0.3962\\
+Residual multitask DL & 0.7266 & 0.3298\\
+Feature-fusion RF & 0.7156 & 0.3284\\
+Stronger RF & 0.7674 & 0.4063\\
+Probability blend & 0.7685 & 0.3983\\
+\bottomrule\end{tabular}\end{table}
+
+The probability blend leads ROC-AUC (0.7685), while stronger RF leads average precision (0.4063). Stronger forest settings improve ROC-AUC by 0.0133 over the historical Phase 1 result; adding neural scores contributes a further 0.0011. Blending reduces AP by 0.0080 versus stronger RF. Thus the ensemble is not a universal metric improvement, and no significance claim is made for the small ROC-AUC increment.
+
+\subsection{Metric Definitions and Reporting Protocol}
+ROC-AUC measures ranking across classification thresholds and can be interpreted as the probability that a randomly selected active example receives a higher score than a randomly selected inactive example, with the usual handling of ties. Average precision summarizes precision at successive increases in recall. The implementation uses average precision, which is not identical to trapezoidal integration of a precision--recall curve.
+
+For true positives $TP$, false positives $FP$, false negatives $FN$ and true negatives $TN$,
+\begin{align}
+\mathrm{Precision}&=\frac{TP}{TP+FP},\\
+\mathrm{Recall}&=\frac{TP}{TP+FN},\\
+F_1&=\frac{2TP}{2TP+FP+FN},\\
+\mathrm{Balanced\ Accuracy}&=\frac{1}{2}\left(\frac{TP}{TP+FN}+\frac{TN}{TN+FP}\right).
+\end{align}
+Undefined divisions require an explicit implementation convention. Accuracy alone can be misleading when inactive compounds dominate. Average precision complements ROC-AUC by emphasizing the quality of positive retrieval, and must be interpreted relative to active prevalence.
+
+A macro score is the arithmetic mean of the 12 endpoint scores, giving each assay equal weight. It differs from pooling all molecule--assay predictions into a single micro score. Ranking metrics are threshold-free; F1, recall and confusion matrices depend on the selected threshold. The live demonstration uses a stated default of 0.5. Any optimized threshold must be chosen on validation labels and frozen before test evaluation.
+
+\subsection{Uncertainty and Fair Comparison}
+The original classical evaluation includes bootstrap estimates and paired comparisons. Such comparisons require predictions for exactly the same observed test molecules for each endpoint. Their conclusions do not automatically transfer to a separately refitted model bundle. Likewise, the standard deviation across three random seeds measures training variation under a fixed split, not uncertainty over all possible chemical populations. The corrected demo table reports descriptive point estimates; no new claim of statistical significance is made.
+
+
+\subsection{Earlier-Network Three-Seed Experiments}
+The earlier-network evaluation compares multitask and single-task learning across seeds 42, 21 and 7. Its summary reports multitask ROC-AUC $0.7472\pm0.0065$ and average precision $0.3286\pm0.0145$, versus single-task ROC-AUC $0.7020\pm0.0076$. The mean ROC-AUC difference is 0.0452. These are experiment means with standard deviations across seeds, not confidence intervals or verified saved-checkpoint metrics. They must not replace the historical row in Table~\ref{tab:main}.
+
+Dropout removal, loss-weight removal and single-task training form the principal neural ablations. The committed summary reports mean active recall 0.6416 for weighted multitask learning and 0.1795 for unweighted learning. This is threshold-dependent and should not be interpreted as universal superiority of weighting at all operating points. Member 4 provides endpoint-level confusion matrices, descriptor error profiles and validation threshold analysis. Error patterns suggest areas for investigation rather than proving biochemical causes.
+
+
+\subsection{Reading the Ablation Results}
+The earlier-network original-dropout three-seed configuration reports mean ROC-AUC 0.7472 and average precision 0.3286. Removing dropout yields 0.7476 and 0.3207 respectively. The mixed direction of these changes does not support a blanket claim that dropout improves every metric. The weighted-loss configuration has mean recall 0.6416, compared with 0.1795 without weighting at the evaluated operating point. Yet the unweighted model's mean average precision is 0.3489, compared with 0.3286 for the weighted model. This illustrates the distinction between ranking performance and threshold-specific sensitivity.
+
+The single-task comparison asks whether separate networks lose information-sharing benefits. Its lower mean ROC-AUC is consistent with a benefit from shared learning under the tested settings, but the small number of seeds and fixed partition limit generalization. The descriptor ablation shows a small historical hybrid difference, 0.0015 ROC-AUC; this should not be overstated without an uncertainty analysis.
+
+\subsection{Error Analysis Strategy}
+False positives and false negatives should be examined per assay rather than collapsed into a single toxicity label. The project provides endpoint metrics, confusion matrices and molecular error inspection. A useful investigation begins with an assay's positive prevalence, then considers score distributions, structural families and descriptor differences between correct and incorrect predictions. These observations can motivate hypotheses about distribution shift or representation limitations.
+
+A low average precision on a rare endpoint can coexist with a moderate ROC-AUC. Conversely, a high recall achieved by flagging many compounds can impose a large false-positive burden. The desired operating point depends on downstream screening priorities and is not established by this project. Structural explanations inferred from error cases remain hypotheses unless supported by additional chemical or experimental evidence.
+
+
+\section{Inference and Demonstration}
+The application serves four current methods: the residual neural network, stronger raw-feature RF, feature-fusion RF and the 80/20 probability blend. The Phase 1 forest is a historical comparison, not the currently served stronger RF. Each molecule yields 48 scores (12 assays times four methods). RDKit validates and canonicalizes SMILES; extraction preserves fingerprint settings and descriptor order. Training scaler statistics are reused unchanged.
+
+The neural model is loaded on CPU in evaluation mode with gradients disabled. Matching checkpoint embeddings feed the 2,181-dimensional fusion arm. The stronger forest sees the original input and its scores are blended with the neural scores. The application exposes measured local bundle metrics as well as the source published comparison; numerical differences must be labelled rather than overwritten. Preparation records package versions, the checkpoint hash, forest settings and alpha. The checkpoint hash is checked before prediction.
+
+\subsection{Current Endpoint-Level Comparison}
+The selected neural model has test macro recall 0.2984 at threshold 0.5. Its strongest ROC-AUC endpoint is SR-MMP (0.8083) and weakest is NR-ER (0.6293). These vary by assay and should not be generalized to all chemical populations.
+\begin{table*}[t]\centering\small
+\caption{Current published endpoint test metrics: ROC-AUC and average precision}
+\label{tab:endpoints}
+\begin{tabular}{lrrrrrr}\toprule
+&\multicolumn{2}{c}{Stronger RF}&\multicolumn{2}{c}{Residual DL}&\multicolumn{2}{c}{Blend}\\
+Endpoint & ROC & AP & ROC & AP & ROC & AP\\\midrule
+NR-AR & 0.7333 & 0.4889 & 0.7736 & 0.4901 & 0.7401 & 0.4882\\
+NR-AR-LBD & 0.8333 & 0.4698 & 0.7664 & 0.4047 & 0.8281 & 0.4710\\
+NR-AhR & 0.8261 & 0.5561 & 0.7986 & 0.4863 & 0.8265 & 0.5523\\
+NR-Aromatase & 0.7680 & 0.4416 & 0.7058 & 0.2298 & 0.7730 & 0.3917\\
+NR-ER & 0.6523 & 0.3709 & 0.6293 & 0.3254 & 0.6511 & 0.3704\\
+NR-ER-LBD & 0.7764 & 0.3953 & 0.6851 & 0.3058 & 0.7665 & 0.3811\\
+NR-PPAR-gamma & 0.7922 & 0.3085 & 0.7509 & 0.1383 & 0.7917 & 0.2848\\
+SR-ARE & 0.7356 & 0.5069 & 0.6913 & 0.4335 & 0.7335 & 0.5050\\
+SR-ATAD5 & 0.7642 & 0.1348 & 0.6908 & 0.1267 & 0.7686 & 0.1456\\
+SR-HSE & 0.7476 & 0.2811 & 0.7046 & 0.2108 & 0.7569 & 0.2665\\
+SR-MMP & 0.8319 & 0.6001 & 0.8083 & 0.5466 & 0.8385 & 0.5998\\
+SR-p53 & 0.7478 & 0.3221 & 0.7139 & 0.2598 & 0.7480 & 0.3235\\
+\bottomrule\end{tabular}\end{table*}
+
+\subsection{Unified Dashboard and User Workflow}
+The application presents the project as one system through six sections: Overview, Data and Molecular Features, Model Architectures, Experiments and Results, Predict a Molecule, and Report and Presentation. The overview summarizes the dataset and verified model comparison. The data section explains label coverage and feature construction. The architecture section exposes classical models, the neural network, its training history and the hybrid route. The experiment section distinguishes historical results, the verified bundle and ablation studies.
+
+For inference, the user enters a SMILES string or chooses a preset. Invalid or empty structures are rejected before feature extraction. A valid input is canonicalized, featurized and evaluated by the saved models. The output contains 48 scores: 12 endpoints for each of four methods. The interface also renders the molecular structure and exports a CSV containing endpoint, model, activity score, predicted class, threshold and canonical SMILES. Results remain associated with the molecule that was actually evaluated.
+
+\subsection{Verification Performed}
+The inference tests cover invalid-input rejection, agreement between regenerated features and stored artifacts, agreement between regenerated embeddings and the corrected checkpoint export, and deterministic prediction output. The existing neural-model test suite also passes. Dashboard checks exercise all six navigation sections and verify a complete live prediction with 48 scores. These checks support functional integration; they do not establish calibration, clinical usefulness or robustness to every possible molecule.
+
+The corrected bundle records the neural checkpoint's SHA-256 digest and software versions. Inference checks the recorded digest before loading the model, so a changed checkpoint cannot silently reuse incompatible downstream artifacts. The exported forest files are intended to be loaded only from the trusted project bundle. Rebuilding after a checkpoint change must regenerate both matching embeddings and hybrid forests.
+
+
+\section{Limitations and Future Work}
+The dataset is small and imbalanced, and the single frozen scaffold partition does not capture all prospective distribution shifts. Three training seeds quantify only part of experimental variation. Some original documentation mixes production results and separate ablation summaries; this report keeps their provenance distinct. The probability blend improves ROC-AUC slightly over stronger RF, but not average precision; uncertainty in this increment remains unresolved. Neither feature associations nor error profiles establish causal toxicological mechanisms. Future work may assess calibration on validation data, alternative bottleneck sizes and repeated scaffold partitions while maintaining an untouched evaluation protocol.
+
+\section{Team Contributions and Reproducibility}
+Member 1 owns the split contract, masked data loader and literature table. Member 2 owns the multitask network, training and embeddings. Member 3 owns the hybrid forests. Member 4 owns evaluation and ablations. Member 5 owns inference integration, the demonstration, submission assembly and operational documentation. Individual attribution and commit evidence are maintained in the accompanying contribution record.
+
+Install root requirements and launch \texttt{streamlit run app.py}. If needed, rebuild the inference bundle using the \texttt{prepare\_models} module documented in the Member 5 guide. Run the Member 5 test suite with unittest discovery in its tests directory. Exact commands and demonstration steps are in the adjacent setup and reproduction guide. Reported model metrics come from committed team experiment artifacts; Member 5 does not claim to have rerun all training experiments.
+
+
+\subsection{Reproduction Sequence and Artifact Ownership}
+A complete reproduction begins with the frozen data artifacts and their validation summary. Classical models consume the combined feature matrix. Neural training consumes the same matrix with label masks and training-derived positive weights. The saved checkpoint must then be restored before any embedding export. Feature fusion joins embeddings with all 2,053 original features. The probability blend combines raw-feature RF and neural scores using the fixed validation-selected alpha. Evaluation is performed with unchanged split membership, followed by integration parity checks and dashboard prediction tests.
+
+The project stores model configuration, training history, checkpoint files, feature/scaler artifacts, endpoint predictions and aggregate metrics separately. This separation makes it possible to inspect the origin of a result and rebuild only the stage that changed. Model files alone are insufficient for reproduction: feature order, scaler parameters, endpoint order and package versions are also part of the prediction contract.
+
+For submission, the report, slides and dashboard should cite the same experiment family for each number. The title page records all five names and roll numbers. Person-to-work-area attribution should be confirmed by the team rather than inferred from the name ordering. The repository provides implementation and result evidence for both phases, while individual understanding must be demonstrated through explanation of the methods, experiments and limitations.
+
+
+\section{Conclusion}
+The project compares classical ML, a residual multitask network and two hybrid strategies under a common data contract. The current residual DL reports 0.7266 ROC-AUC and 0.3298 AP. Feature fusion reaches 0.7156/0.3284; stronger RF reaches 0.7674/0.4063; the validation-selected 80/20 blend reaches 0.7685/0.3983. Stronger forests account for most ROC-AUC improvement over Phase 1, with a smaller incremental contribution from neural probabilities. The strongest ROC-AUC and AP belong to different methods. The unified application now supports both hybrid strategies, with explicit versioning for earlier-network ablations and matching saved-model inference.
+
+\begin{thebibliography}{7}
+\bibitem{deeptox} A. Mayr et al., ``DeepTox: Toxicity Prediction using Deep Learning,'' Frontiers in Environmental Science, 2016. doi:10.3389/fenvs.2015.00080.
+\bibitem{huang} R. Huang et al., ``Profiling of the Tox21 10K compound library for agonists and antagonists of the estrogen receptor alpha signaling pathway,'' Scientific Reports, 2014. doi:10.1038/srep05664.
+\bibitem{fourches} D. Fourches, E. Muratov and A. Tropsha, ``Trust, but Verify: On the Importance of Chemical Structure Curation in Cheminformatics and QSAR Modeling Research,'' Journal of Chemical Information and Modeling, 2010. doi:10.1021/ci100176x.
+\bibitem{ramsundar} B. Ramsundar et al., ``Massively Multitask Networks for Drug Discovery,'' arXiv:1502.02072, 2015.
+\bibitem{moleculenet} Z. Wu et al., ``MoleculeNet: a benchmark for molecular machine learning,'' Chemical Science, vol. 9, pp. 513--530, 2018.
+\bibitem{morgan} D. Rogers and M. Hahn, ``Extended-Connectivity Fingerprints,'' Journal of Chemical Information and Modeling, vol. 50, pp. 742--754, 2010.
+\bibitem{breiman} L. Breiman, ``Random Forests,'' Machine Learning, vol. 45, pp. 5--32, 2001.
+\end{thebibliography}
+\end{document}

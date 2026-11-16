@@ -1,4 +1,6 @@
-# Phase 2 — Member 4: Comprehensive Evaluation, Systematic Ablation Studies & Toxicological Error Analysis
+> **Version scope:** This directory documents earlier-network ablations, not the current residual model. See the root README for current 0.7266 DL, 0.7156 fusion, 0.7674 stronger RF and 0.7685 blend ROC-AUC results. Three-seed values below belong only to the earlier architecture.
+
+# Phase 2 — Comprehensive Evaluation, Systematic Ablation Studies & Toxicological Error Analysis
 
 **Role:** Senior Machine Learning Engineer & Lead Benchmark Evaluator  
 **Status:** Certified, Complete & 100% Reproducible Across 3 Random Seeds  
@@ -8,9 +10,9 @@
 
 ## 1. Executive Summary & Deliverables
 
-Member 4 is responsible for the **final scientific evaluation, statistical benchmarking, and systematic ablation experiments** of Phase 2:
+Evaluation is responsible for the **final scientific evaluation, statistical benchmarking, and systematic ablation experiments** of Phase 2:
 
-1. **Zero-Leakage Benchmark Protocol:** Evaluated all models strictly on Member 1's frozen Bemis–Murcko scaffold split (Split B: **6,259 train / 782 validation / 782 holdout test**, total **7,823 compounds**). Zero test compound IDs, scaffolds, or labels were used during hyperparameter selection or decision threshold tuning.
+1. **Zero-Leakage Benchmark Protocol:** Evaluated all models strictly on the data pipeline module’s frozen Bemis–Murcko scaffold split (Split B: **6,259 train / 782 validation / 782 holdout test**, total **7,823 compounds**). Zero test compound IDs, scaffolds, or labels were used during hyperparameter selection or decision threshold tuning.
 2. **Three-Seed Statistical Rigor:** All training and evaluation pipelines execute across 3 synchronized random seeds (**42, 21, 7**), quantifying mean performance and variance ($\text{mean} \pm \text{std}$) with zero fabricated numbers.
 3. **Task 4 — Dropout Regularization Ablation (6 Models Trained):** Compared the canonical deep multitask network ($p=0.35$ trunk, $p=0.175$ bottleneck) against a zero-dropout baseline ($p=0.0$). Demonstrated that dropout prevents sparse fingerprint bit co-adaptation, preserving PR-AUC ($0.3286 \pm 0.0145$ vs. $0.3207 \pm 0.0209$) and precision ($0.2114 \pm 0.0314$ vs. $0.1887 \pm 0.0080$).
 4. **Task 5 — Positive Class-Weighting Ablation (6 Models Trained):** Compared positive-weighted masked loss ($w_j = 5.71 \to 38.85$) against unweighted loss ($w_j = 1.0$). Proved that unweighted loss causes active compound recall to collapse from **64.16% down to 17.95%**, spiking missed toxic hazards from 249 to 558 false negatives.
@@ -35,7 +37,7 @@ phase2/member4_evaluation/
 │   └── single_task_config.json         # Task 6 single-task network dimensions & training
 ├── src/
 │   ├── __init__.py                     # Package exports
-│   ├── data_utils.py                   # Certified wrapper around Member 1 data loader
+│   ├── data_utils.py                   # Certified wrapper around Data pipeline data loader
 │   ├── prediction_loader.py            # Unified ingestion for RF, DL, and Hybrid predictions
 │   ├── metrics.py                      # Classification metrics, validation threshold optimizer
 │   ├── dropout_ablation.py             # Task 4 training harness & diagnostic plotting
@@ -91,9 +93,9 @@ All models were evaluated on the **exact same 782 holdout test molecules (Split 
 | Model Architecture | Phase / Member | Input Feature Representation | Holdout ROC-AUC | Holdout PR-AUC | $F_1$-Score | Balanced Acc | MCC | Primary Finding |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
 | **Standalone Random Forest** | Phase 1 / Baseline | 2,053 (2,048 Morgan + 5 Descriptors) | **0.7541** | **0.3962** | **0.3969** | **0.6684** | **0.3141** | **Strongest overall model** on high-dimensional sparse binary bits |
-| **MultiTask Deep Learning** | Phase 2 / Member 2 | 2,053 $\to$ 128 bottleneck $\to$ 12 heads | **0.7472 ± 0.0065** | **0.3286 ± 0.0145** | **0.3049 ± 0.0253** | **0.6974 ± 0.0253** | **0.2543 ± 0.0177** | Multi-task shared representations transfer effectively across assays |
-| **Single-Task Deep Learning** | Phase 2 / Member 4 | 2,053 per endpoint (12 independent nets) | **0.7020 ± 0.0076** | **0.3197 ± 0.0084** | 0.3335 ± 0.0167 | 0.6485 ± 0.0040 | 0.2500 ± 0.0118 | Lacks cross-endpoint transfer; fails on data-poor assays ($\Delta = -0.0452$) |
-| **ML+DL Hybrid Model** | Phase 2 / Member 3 | 133 (128 embeddings + 5 descriptors) | **0.6753** | **0.3009** | 0.2933 | 0.5921 | 0.2712 | **Weakest architecture**; bottleneck compression discards orthogonal bits |
+| **MultiTask Deep Learning** | Phase 2 / Deep learning | 2,053 $\to$ 128 bottleneck $\to$ 12 heads | **0.7472 ± 0.0065** | **0.3286 ± 0.0145** | **0.3049 ± 0.0253** | **0.6974 ± 0.0253** | **0.2543 ± 0.0177** | Multi-task shared representations transfer effectively across assays |
+| **Single-Task Deep Learning** | Phase 2 / Evaluation | 2,053 per endpoint (12 independent nets) | **0.7020 ± 0.0076** | **0.3197 ± 0.0084** | 0.3335 ± 0.0167 | 0.6485 ± 0.0040 | 0.2500 ± 0.0118 | Lacks cross-endpoint transfer; fails on data-poor assays ($\Delta = -0.0452$) |
+| **ML+DL Hybrid Model** | Phase 2 / Hybrid modeling | 133 (128 embeddings + 5 descriptors) | **0.6753** | **0.3009** | 0.2933 | 0.5921 | 0.2712 | **Weakest architecture**; bottleneck compression discards orthogonal bits |
 
 ---
 
@@ -236,7 +238,7 @@ Using default 0.5 probability thresholds on imbalanced datasets severely depress
 | **SR-p53** | 0.5841 | 623 | 65 | 10.43% | 32 | 113 | 33 | 0.2207 | 0.4923 | **0.3048** |
 
 ### 7.2 Physicochemical Failure Mode Analysis
-By joining model prediction errors with Member 1's continuous molecular descriptors (`MolWt`, `TPSA`, `MolLogP`, `NumHDonors`, `NumHAcceptors`), we uncovered the chemical signatures of classification failures:
+By joining model prediction errors with the data pipeline module’s continuous molecular descriptors (`MolWt`, `TPSA`, `MolLogP`, `NumHDonors`, `NumHAcceptors`), we uncovered the chemical signatures of classification failures:
 
 | Molecular Descriptor | True Positives (Detected Actives) | False Negatives (Missed Actives) | Structural Difference ($\Delta$) | Biological & Chemical Interpretation |
 | :--- | :---: | :---: | :---: | :--- |
@@ -315,7 +317,7 @@ pip install -r requirements.txt
 ```
 
 ### 9.4 Master One-Click Orchestrator
-To execute the entire Phase 2 Member 4 evaluation pipeline sequentially:
+To execute the entire Phase 2 Evaluation evaluation pipeline sequentially:
 ```bash
 .venv/bin/python -m phase2.member4_evaluation.run_all
 ```
@@ -341,7 +343,7 @@ To execute the entire Phase 2 Member 4 evaluation pipeline sequentially:
 
 ---
 
-## 11. Individual Member 4 Contributions
+## 11. Individual Evaluation Contributions
 
 - **Architect & Lead Author:** Built the entire `phase2/member4_evaluation/` module from scratch.
 - **Experimental Execution:** Trained and evaluated **48 distinct PyTorch neural network checkpoints** across seeds 42, 21, and 7 (zero mock data).
